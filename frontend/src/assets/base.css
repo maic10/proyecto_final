@@ -1,0 +1,170 @@
+/* ==== Fuente: Amiko ==== */
+@import url('https://fonts.googleapis.com/css?family=Amiko:700|Amiko:400');
+
+/* ==== Modo claro (por defecto) ==== */
+:root {
+  --color-texto: #02080d;
+  --color-fondo: #f6fbfe;
+  --color-primario: #2d9bd2;
+  --color-primario-hover: #2388bd;
+  --color-primario-active: #1c6d99;
+
+  --color-secundario: #8d90e7;
+  --color-secundario-hover: #6f72db;
+  --color-secundario-active: #595ccf;
+
+  --color-exito: #0a9396;
+  --color-exito-hover: #087e81;
+  --color-exito-active: #066466;
+
+  --color-advertencia: #ee9b00;
+  --color-advertencia-hover: #cc8400;
+  --color-advertencia-active: #a96e00;
+
+  --color-peligro: #ae2012;
+  --color-peligro-hover: #931b10;
+  --color-peligro-active: #78150d;
+
+  --color-acento: #7f68df;
+
+  /* Integración con Bootstrap */
+  --bs-body-bg: var(--color-fondo);
+  --bs-body-color: var(--color-texto);
+  --bs-primary: var(--color-primario);
+  --bs-secondary: var(--color-secundario);
+}
+
+/* ==== Modo oscuro (por clase `.modo-oscuro`) ==== */
+.modo-oscuro {
+  --color-texto: #f2f8fd;
+  --color-fondo: #010609;
+  --color-primario: #2d9bd2;
+  --color-primario-hover: #2388bd;
+  --color-primario-active: #1c6d99;
+
+  --color-secundario: #181b72;
+  --color-secundario-hover: #2b2d87;
+  --color-secundario-active: #1f2169;
+
+  --color-acento: #382097;
+
+  --bs-body-bg: var(--color-fondo);
+  --bs-body-color: var(--color-texto);
+  --bs-primary: var(--color-primario);
+  --bs-secondary: var(--color-secundario);
+}
+
+/* ==== Fuente global ==== */
+* {
+  font-family: 'Amiko', sans-serif !important;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  line-height: 1.6;
+}
+
+/* ==== Escala tipográfica ==== */
+html { font-size: 100%; }
+
+h1 { font-size: 4.210rem; font-weight: 700; }
+h2 { font-size: 3.158rem; font-weight: 700; }
+h3 { font-size: 2.369rem; font-weight: 700; }
+h4 { font-size: 1.777rem; font-weight: 700; }
+h5 { font-size: 1.333rem; font-weight: 700; }
+small { font-size: 0.750rem; }
+
+/* ==== Estilos base ==== */
+p { margin-bottom: 1rem; }
+.container { padding: 2rem 1rem; }
+
+/* ==== Botones Bootstrap personalizados ==== */
+.btn {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--color-primario) !important;
+  border-color: var(--color-primario) !important;
+  color: #fff !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--color-primario-hover) !important;
+  border-color: var(--color-primario-hover) !important;
+}
+.btn-primary:active {
+  background-color: var(--color-primario-active) !important;
+  border-color: var(--color-primario-active) !important;
+}
+
+.btn-secondary {
+  background-color: var(--color-secundario) !important;
+  border-color: var(--color-secundario) !important;
+  color: #fff !important;
+}
+.btn-secondary:hover,
+.btn-secondary:focus {
+  background-color: var(--color-secundario-hover) !important;
+  border-color: var(--color-secundario-hover) !important;
+}
+.btn-secondary:active {
+  background-color: var(--color-secundario-active) !important;
+  border-color: var(--color-secundario-active) !important;
+}
+
+.btn-success {
+  background-color: var(--color-exito) !important;
+  border-color: var(--color-exito) !important;
+  color: #fff !important;
+}
+.btn-success:hover,
+.btn-success:focus {
+  background-color: var(--color-exito-hover) !important;
+  border-color: var(--color-exito-hover) !important;
+}
+.btn-success:active {
+  background-color: var(--color-exito-active) !important;
+  border-color: var(--color-exito-active) !important;
+}
+
+.btn-warning {
+  background-color: var(--color-advertencia) !important;
+  border-color: var(--color-advertencia) !important;
+  color: #fff !important;
+}
+.btn-warning:hover,
+.btn-warning:focus {
+  background-color: var(--color-advertencia-hover) !important;
+  border-color: var(--color-advertencia-hover) !important;
+}
+.btn-warning:active {
+  background-color: var(--color-advertencia-active) !important;
+  border-color: var(--color-advertencia-active) !important;
+}
+
+.btn-danger {
+  background-color: var(--color-peligro) !important;
+  border-color: var(--color-peligro) !important;
+  color: #fff !important;
+}
+.btn-danger:hover,
+.btn-danger:focus {
+  background-color: var(--color-peligro-hover) !important;
+  border-color: var(--color-peligro-hover) !important;
+}
+.btn-danger:active {
+  background-color: var(--color-peligro-active) !important;
+  border-color: var(--color-peligro-active) !important;
+}
+
+/* ==== Card personalizada ==== */
+.card {
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
