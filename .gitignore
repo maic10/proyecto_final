@@ -1,0 +1,36 @@
+# Entorno virtual de Python (backend)
+backend/Scripts/
+backend/Include/
+backend/Lib/
+backend/pyvenv.cfg
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Variables de entorno
+.env
+*.env
+
+# Archivos de logs
+*.log
+
+# Dependencias de Node.js (frontend)
+frontend/node_modules/
+
+# Archivos de compilación de frontend
+frontend/dist/
+frontend/build/
+
+# Archivos temporales
+*.tmp
+*.swp
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de VS Code
+.vscode/
