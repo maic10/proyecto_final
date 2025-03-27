@@ -3,6 +3,8 @@ backend/Scripts/
 backend/Include/
 backend/Lib/
 backend/pyvenv.cfg
+backend/share/
+backend/insightface/
 
 # Archivos temporales de Python
 __pycache__/
