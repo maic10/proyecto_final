@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 
 function PaginaTransmision() {
+  console.log("Cargando página de transmisión"); // Depurar
   const [registros, setRegistros] = useState([]);
   
   const cargarAsistenciaActual = async () => {

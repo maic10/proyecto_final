@@ -28,3 +28,8 @@ from src.servidor.api.routes.clases import *
 from src.servidor.api.routes.asistencias import *
 from src.servidor.api.routes.raspberry import *
 from src.servidor.api.routes.estudiantes import *
+from src.servidor.api.routes.video import *
+
+
+# Inicia el hilo de recepción de video al cargar la app
+#import src.servidor.video
