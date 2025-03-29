@@ -5,6 +5,7 @@ import BarraNavegacion from './components/BarraNavegacion';
 import PaginaEstudiantes from './pages/PaginaEstudiantes';
 import PaginaAsistencias from './pages/PaginaAsistencias';
 import PaginaAsistenciaDetalle from './pages/PaginaAsistenciaDetalle';
+import PaginaTransmision from './pages/PaginaTransmision';
 import RutaPrivada from './components/RutaPrivada';
 import { estaAutenticado } from './state/auth';
 
@@ -22,6 +23,7 @@ function AppWrapper() {
         <Route path="/estudiantes" element={<RutaPrivada><PaginaEstudiantes /></RutaPrivada>} />
         <Route path="/asistencias" element={<RutaPrivada><PaginaAsistencias /></RutaPrivada>} />
         <Route path="/asistencias/detalle" element={<RutaPrivada><PaginaAsistenciaDetalle /></RutaPrivada>} />
+        <Route path="/transmision" element={<RutaPrivada><PaginaTransmision /></RutaPrivada>} />
         {/* Agregar una ruta para manejar 404 */}
         <Route path="*" element={<div><h2>404 - Página no encontrada</h2><p>La ruta {location.pathname} no existe.</p></div>} />
       </Routes>
