@@ -1,5 +1,3 @@
-# src/servidor/video/receptor.py
-
 import cv2
 import subprocess
 import numpy as np
@@ -8,13 +6,15 @@ import time
 from src.logica import FaceTracker
 
 # Variables compartidas
-ultima_frame = None
+frame_actual = None
 lock = threading.Lock()
+recepcion_iniciada = False
+hilo_recepcion = None
 
-def iniciar_recepcion_video():
-    global ultima_frame
+def _recepcion_loop():
+    global frame_actual
     width, height = 640, 480
-    ffmpeg_cmd = [
+    cmd = [
         'ffmpeg',
         '-protocol_whitelist', 'file,udp,rtp',
         '-fflags', '+nobuffer+flush_packets',
@@ -29,40 +29,36 @@ def iniciar_recepcion_video():
         '-'
     ]
 
-    process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
-    face_tracker = FaceTracker()
+    print("[VIDEO] Iniciando recepción de video...")
+    proceso = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    tracker = FaceTracker()
 
     while True:
-        raw_frame = process.stdout.read(width * height * 3)
-        if not raw_frame or len(raw_frame) != width * height * 3:
+        raw = proceso.stdout.read(width * height * 3)
+        if not raw or len(raw) != width * height * 3:
             continue
-
-        frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width, 3))
-        frame_procesado = face_tracker.process_frame(frame)
-
-        # Mostrar en pantalla del servidor para test
-        #cv2.imshow("Servidor - Detección en tiempo real", frame_procesado)
-        #if cv2.waitKey(1) & 0xFF == ord('q'):
-        #    break
-
-        # Actualizar el frame compartido para MJPEG
+        frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
+        procesado = tracker.process_frame(frame)
         with lock:
-            ultima_frame = frame_procesado
+            frame_actual = procesado.copy()
 
-    # Limpieza al cerrar
-    process.terminate()
-    cv2.destroyAllWindows()
-
+def iniciar_si_es_necesario():
+    global recepcion_iniciada, hilo_recepcion
+    if not recepcion_iniciada:
+        hilo_recepcion = threading.Thread(target=_recepcion_loop, daemon=True)
+        hilo_recepcion.start()
+        recepcion_iniciada = True
+        print("[VIDEO] Hilo de recepción lanzado.")
 
 def generar_frames():
-    global ultima_frame
+    iniciar_si_es_necesario()
+    print("[MJPEG] Cliente conectado, generando frames...")
     while True:
         with lock:
-            if ultima_frame is None:
+            if frame_actual is None:
                 continue
-            ret, buffer = cv2.imencode('.jpg', ultima_frame)
+            ret, buffer = cv2.imencode('.jpg', frame_actual)
             frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        time.sleep(0.05)  # 20 FPS máx
-        print("[MJPEG] Enviando frame al cliente...")
+        time.sleep(0.04)  # 25 fps aprox.
