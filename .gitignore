@@ -5,6 +5,7 @@ backend/Lib/
 backend/pyvenv.cfg
 backend/share/
 backend/insightface/
+backend/src/recursos
 
 # Archivos temporales de Python
 __pycache__/
