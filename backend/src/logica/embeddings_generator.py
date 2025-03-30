@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import os
 import cv2
 import numpy as np
@@ -66,13 +64,13 @@ class EmbeddingsGenerator:
         return self.embeddings_dict
 
 if __name__ == "__main__":
-    # Ejemplo de uso standalone
-    IMAGES_DIR = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\imagenes"  # Ajusta esta ruta
+    IMAGES_DIR = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\imagenes"
     generator = EmbeddingsGenerator(IMAGES_DIR)
     embeddings = generator.load_and_generate_embeddings()
     
-    # Mostrar los resultados (opcional, para pruebas)
+    print("\n--- Embeddings generados para insertar en MongoDB ---\n")
     for alumno_id, embeddings_list in embeddings.items():
-        print(f"Alumno {alumno_id}: {len(embeddings_list)} embeddings generados.")
-
-    #print(generator.get_embeddings())
+        print(f'"{alumno_id}": [')
+        for emb in embeddings_list:
+            print(f"  {emb.tolist()},")  # Convertimos cada np.array a lista
+        print("]\n")

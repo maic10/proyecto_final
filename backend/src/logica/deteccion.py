@@ -8,7 +8,7 @@ from ultralytics.trackers.byte_tracker import BYTETracker
 from argparse import Namespace
 import time
 import os  # Añadimos esta importación para manejar directorios y archivos
-from embeddings_generator import EmbeddingsGenerator  # Para pruebas
+from src.logica.embeddings_generator import EmbeddingsGenerator  # Para pruebas
 
 # Configurar argumentos para BYTETracker
 args = Namespace(
@@ -124,10 +124,11 @@ class FaceTracker:
         identified_names = self.identify_faces(faces, tracked_objects)
 
         # Directorio para guardar rostros identificados
+        """"
         output_dir = "C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/rostros_identificados"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)  # Crear el directorio si no existe
-
+        """
         # Dibujar los objetos rastreados
         for track_id, bbox in face_assignments.items():
             x1, y1, x2, y2 = bbox
@@ -146,6 +147,7 @@ class FaceTracker:
             label = f"ID: {track_id}"
             if track_id in identified_names:
                 label += f" - {identified_names[track_id]}"
+                """
                 # Guardar el rostro si es conocido (no "Desconocido")
                 if identified_names[track_id] != "Desconocido":
                     # Extraer la región del rostro del frame
@@ -154,7 +156,7 @@ class FaceTracker:
                         output_path = os.path.join(output_dir, f"ID{track_id}_{identified_names[track_id]}_{self.frame_count}.jpg")
                         cv2.imwrite(output_path, face_region)
                         print(f"💾 Rostro guardado: {output_path}")
-
+                """
             cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             
         # Calcular y mostrar FPS
