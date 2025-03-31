@@ -40,7 +40,8 @@ class FaceTracker:
         self.frame_count = 0
         self.fps_start_time = time.time()
         self.last_faces = []
-        self.embeddings_dict = embeddings_dict  # Diccionario de embeddings de alumnos
+        self.embeddings_dict = embeddings_dict  # Diccionario de embeddings de alumnos de MongoDB
+        self.identified_faces = {}  # Mapea track_id -> id_estudiante
     
     def identify_faces(self, faces, tracked_objects):
         """
@@ -165,6 +166,8 @@ class FaceTracker:
             fps = self.frame_count / elapsed_time
             cv2.putText(frame_resized, f"FPS: {fps:.2f}", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        
+        self.identified_faces = identified_names  # Guardar para uso externo
 
         return frame_resized
 

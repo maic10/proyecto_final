@@ -1,10 +1,22 @@
+# src/servidor/video/receptor.py
+
 import cv2
 import subprocess
 import numpy as np
 import threading
 import time
+from datetime import datetime
 from src.logica import FaceTracker
-from src.logica.utils import cargar_embeddings_desde_db
+from src.logica.utils import (
+    cargar_embeddings_por_clase,
+    registrar_asistencia_en_db
+)
+
+
+# Modo de prueba activado (usará cámara o video en lugar de ffmpeg)
+MODO_LOCAL = True
+MODO_LOCAL_CAMARA = False  # True si quieres usar cámara, False si prefieres video
+VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
 
 
 # Variables compartidas
@@ -13,32 +25,59 @@ lock = threading.Lock()
 recepcion_iniciada = False
 hilo_recepcion = None
 
-def _recepcion_loop(modo_video_local=False, ruta_video=None):
+def hay_transmision_activa():
+    return frame_actual is not None
+
+def iniciar_transmision_para_clase(id_clase):
+    global recepcion_iniciada, hilo_recepcion
+
+    if recepcion_iniciada:
+        print("[TRANSMISIÓN] Ya hay una transmisión activa.")
+        return
+
+    hilo_recepcion = threading.Thread(
+        target=_recepcion_loop_por_clase,
+        args=(id_clase,),
+        daemon=True
+    )
+    hilo_recepcion.start()
+    recepcion_iniciada = True
+    print(f"[TRANSMISIÓN] Hilo de recepción lanzado para clase {id_clase}")
+
+def _recepcion_loop_por_clase(id_clase):
     global frame_actual
     width, height = 640, 480
 
-    # Cargar embeddings desde la base de datos
-    embeddings_dict = cargar_embeddings_desde_db()
-    # Crear instancia de FaceTracker con los embeddings cargados
+    print(f"[TRANSMISIÓN] Preparando embeddings para clase {id_clase}")
+    embeddings_dict = cargar_embeddings_por_clase(id_clase)
     tracker = FaceTracker(embeddings_dict=embeddings_dict)
 
-    # Si el modo de video local está activado, usar video local
-    if modo_video_local:
-        print("[TEST] Modo prueba activado: usando video local")
-        cap = cv2.VideoCapture(ruta_video)
+    if MODO_LOCAL:
+        print("[TEST] Modo local activo")
+        if MODO_LOCAL_CAMARA:
+            cap = cv2.VideoCapture(0)
+        else:
+            cap = cv2.VideoCapture(VIDEO_TEST_PATH)
+
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
             frame = cv2.resize(frame, (width, height))
             procesado = tracker.process_frame(frame)
+
+            # Registrar asistencia
+            #for track_id, nombre in tracker.identified_faces.items():
+             #   if nombre != "Desconocido":
+                    #registrar_asistencia_en_db(id_clase, nombre, 1.0)
+
             with lock:
                 frame_actual = procesado.copy()
-            time.sleep(1 / 25)  # simula fps
+            time.sleep(1 / 25)
         cap.release()
-
+    
     else:
-        print("[VIDEO] Iniciando recepción de video desde ffmpeg...") 
+        print("[VIDEO] Iniciando recepción de video desde ffmpeg...")
         cmd = [
             'ffmpeg',
             '-protocol_whitelist', 'file,udp,rtp',
@@ -53,36 +92,28 @@ def _recepcion_loop(modo_video_local=False, ruta_video=None):
             '-vcodec', 'rawvideo',
             '-'
         ]
-        # Iniciar el proceso ffmpeg
         proceso = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+
         while True:
             raw = proceso.stdout.read(width * height * 3)
             if not raw or len(raw) != width * height * 3:
                 continue
-            frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
-            procesado = tracker.process_frame(frame)
-            with lock:
-                frame_actual = procesado.copy()
 
-def iniciar_si_es_necesario(modo_test=False, video_path=None):
-    global recepcion_iniciada, hilo_recepcion
-    if not recepcion_iniciada:
-        hilo_recepcion = threading.Thread(
-            target=_recepcion_loop,
-            kwargs={'modo_video_local': modo_test, 'ruta_video': video_path},
-            daemon=True
-        )
-        hilo_recepcion.start()
-        recepcion_iniciada = True
-        print("[VIDEO] Hilo de recepción lanzado.")
+            frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
+            frame_procesado = tracker.process_frame(frame)
+
+            # Actualizar frame para transmisión MJPEG
+            with lock:
+                frame_actual = frame_procesado.copy()
+
+            # Registrar asistencias basadas en los nombres identificados
+            for track_id, nombre in tracker.identified_names.items():
+                if nombre == "Desconocido":
+                    continue
+                confianza = 1.0  # O usar una métrica real si la calculas
+                registrar_asistencia_en_db(id_clase, nombre, confianza)
 
 def generar_frames():
-    # Cambia esto a True solo durante pruebas
-    iniciar_si_es_necesario(
-        modo_test=True,
-        video_path= r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\video\video_1.mp4" 
-    )
-    iniciar_si_es_necesario()
     print("[MJPEG] Cliente conectado, generando frames...")
     while True:
         with lock:
@@ -92,4 +123,4 @@ def generar_frames():
             frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        time.sleep(0.04)  # 25 fps aprox.
+        time.sleep(0.04)  # 25 FPS
