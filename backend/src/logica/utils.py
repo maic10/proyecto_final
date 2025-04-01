@@ -88,12 +88,16 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza):
 "" /transmision/iniciar"
 """
 
-def obtener_clase_activa_para_aula(id_aula):
+def obtener_clase_activa_para_aula(id_aula,detener=False):
+
     ahora = datetime.now(pytz.timezone("Europe/Madrid"))
     dia_semana = "monday" #ahora.strftime('%A').lower()
     hora_actual = "08:00" #ahora.strftime('%H:%M')
 
+    fecha_fin = hora_actual
     print(f"[TRANSMISION] Verificando clase activa para aula {id_aula} en {dia_semana} a las {hora_actual}")
+    
+    if detener: fecha_fin = "09:00"  ## Solo para TEST
 
     clases = mongo.db.clases.find({
         "horarios": {
@@ -101,7 +105,7 @@ def obtener_clase_activa_para_aula(id_aula):
                 "dia": dia_semana,
                 "id_aula": id_aula,
                 "hora_inicio": {"$lte": hora_actual},
-                "hora_fin": {"$gt": hora_actual}
+                "hora_fin": {"$gt": fecha_fin}
             }
         }
     })
