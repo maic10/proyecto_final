@@ -1,29 +1,10 @@
 import numpy as np
 from datetime import datetime
-from src.servidor.api import mongo
+#from src.servidor.api import mongo
 import pytz
+from .logger import logger
 
-def cargar_embeddings_desde_db():
-    """
-    Carga los embeddings de los estudiantes desde MongoDB.
-    :return: Diccionario {id_estudiante: [embedding1, embedding2, ...]}
-    """
-    embeddings_dict = {}
-    estudiantes = mongo.db.estudiantes.find({"embeddings": {"$exists": True}})
-    
-    for est in estudiantes:
-        id_estudiante = est["id_estudiante"]
-        embeddings = est.get("embeddings", [])
-
-        # Convertir cada embedding de lista a np.array
-        embeddings_np = [np.array(e) for e in embeddings]
-        embeddings_dict[id_estudiante] = embeddings_np
-        
-        # Mostrar info del estudiante cargado
-        print(f"[EMBEDDINGS] Cargado: {id_estudiante} -> {len(embeddings_np)} embeddings")
-
-    print(f"[EMBEDDINGS] Total de estudiantes con embeddings: {len(embeddings_dict)}")
-    return embeddings_dict
+from src.logica.database import *
 
 # Ajustar el indice en DB
 def cargar_embeddings_por_clase(id_clase):
@@ -33,20 +14,17 @@ def cargar_embeddings_por_clase(id_clase):
     :return: Diccionario {id_estudiante: [embedding1, embedding2, ...]}
     """
     embeddings_dict = {}
-    estudiantes = mongo.db.estudiantes.find({
-        "ids_clases": id_clase,
-        "embeddings": {"$exists": True}
-    })
-
-    for est in estudiantes:
-        id_est = est["id_estudiante"]
-        embeddings = est.get("embeddings", [])
-        embeddings_np = [np.array(e) for e in embeddings]
-        embeddings_dict[id_est] = embeddings_np
-
-        print(f"[EMBEDDINGS] Cargado para clase {id_clase}: {id_est} ({len(embeddings_np)} embeddings)")
-
-    print(f"[EMBEDDINGS] Total cargados para clase {id_clase}: {len(embeddings_dict)} estudiantes")
+    try:
+        estudiantes = get_estudiantes_by_clase(id_clase)
+        for est in estudiantes:
+            id_est = est["id_estudiante"]
+            embeddings = est.get("embeddings", [])
+            embeddings_np = [np.array(e) for e in embeddings]
+            embeddings_dict[id_est] = embeddings_np
+            logger.info(f"Cargado para clase {id_clase}: {id_est} ({len(embeddings_np)} embeddings)")
+        logger.info(f"Total cargados para clase {id_clase}: {len(embeddings_dict)} estudiantes")
+    except Exception as e:
+        logger.error(f"Error al cargar embeddings para clase {id_clase}: {e}")
     return embeddings_dict
 
 
@@ -58,15 +36,14 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza):
     :param confianza: Nivel de similitud
     """
     fecha_actual = datetime.now().strftime("%Y-%m-%d")
-    coleccion = mongo.db.asistencias
-
-    doc = coleccion.find_one({"id_clase": id_clase, "fecha": fecha_actual})
+    doc = get_asistencia(id_clase, fecha_actual)
     if not doc:
-        print(f"[ASISTENCIA] Documento no encontrado para clase {id_clase} en {fecha_actual}")
+        logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha_actual}")
         return
 
     ya_registrado = any(r["id_estudiante"] == id_estudiante for r in doc["registros"])
     if ya_registrado:
+        logger.info(f"Estudiante {id_estudiante} ya registrado para clase {id_clase}")
         return
 
     nuevo_registro = {
@@ -78,21 +55,21 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza):
         "modificado_fecha": None
     }
 
-    coleccion.update_one(
-        {"_id": doc["_id"]},
-        {"$push": {"registros": nuevo_registro}}
-    )
-    print(f"[ASISTENCIA] Estudiante {id_estudiante} registrado con confianza {confianza:.2f}")
+    doc["registros"].append(nuevo_registro)
+    update_asistencia(id_clase, fecha_actual, doc["registros"])
+    logger.info(f"Estudiante {id_estudiante} registrado con confianza {confianza:.2f} para clase {id_clase}")
+
 
 """"
 "" /transmision/iniciar"
 """
 
+"""
 def obtener_clase_activa_para_aula(id_aula,detener=False):
 
     ahora = datetime.now(pytz.timezone("Europe/Madrid"))
     dia_semana = "monday" #ahora.strftime('%A').lower()
-    hora_actual = "08:00" #ahora.strftime('%H:%M')
+    hora_actual = ahora.strftime('%H:%M')
 
     fecha_fin = hora_actual
     print(f"[TRANSMISION] Verificando clase activa para aula {id_aula} en {dia_semana} a las {hora_actual}")
@@ -116,10 +93,11 @@ def obtener_clase_activa_para_aula(id_aula,detener=False):
 
     print("[TRANSMISION] No se encontró clase activa")
     return None    
+"""
 
-def obtener_aula_por_raspberry(id_rpi):
-    rpi = mongo.db.configuracion_raspberry.find_one({"id_raspberry_pi": id_rpi})
-    return rpi.get("id_aula") if rpi else None
+#def obtener_aula_por_raspberry(id_rpi):
+#    rpi = mongo.db.configuracion_raspberry.find_one({"id_raspberry_pi": id_rpi})
+#    return rpi.get("id_aula") if rpi else None
 
 def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
     existe = mongo.db.asistencias.find_one({"id_clase": id_clase, "fecha": fecha_str})
@@ -133,3 +111,84 @@ def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
         print(f"[ASISTENCIA] Documento de asistencia creado para {id_clase} en {fecha_str}")
     else:
         print(f"[ASISTENCIA] Documento ya existe para {id_clase} en {fecha_str}")
+
+########################### NUEVO ###########################
+def obtener_aula_por_raspberry(id_raspberry_pi: str) -> str:
+    """
+    Obtiene el ID del aula asignada a una Raspberry Pi.
+    """
+    raspberry = get_raspberry_by_id(id_raspberry_pi)
+    if not raspberry:
+        return None
+    # Actualizar última conexión
+    update_raspberry_last_connection(id_raspberry_pi)
+    return raspberry.get("id_aula")
+
+def obtener_clase_activa_para_aula(id_aula: str, detener: bool = False) -> str:
+    """
+    Determina si hay una clase activa en un aula en el momento actual.
+    Si detener=True, verifica si la clase ya terminó.
+    """
+    # Obtener la fecha y hora actual
+    now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
+    zona_horaria = pytz.timezone("Europe/Madrid")
+    now = now_utc.astimezone(zona_horaria)  # Convertir a otra zona
+    dia_actual = now.strftime("%A").lower()  # Ej. "monday"
+    hora_actual = now.time()
+    #print (f"[TRANSMISION] FEcha {now}")
+    # Buscar clases que tengan un horario en el aula
+    clases = list(clases_collection.find({"horarios.id_aula": id_aula}))
+    
+    for clase in clases:
+        #print (f"[TRANSMISION] Verificando clase {clase['id_clase']} en aula {id_aula}")
+        for horario in clase["horarios"]:
+            #print (f"[TRANSMISION] Verificando dia actual: {dia_actual}")
+            #print (f"[TRANSMISION] Verificando horario: {horario}")
+            if horario["id_aula"] != id_aula or horario["dia"] != dia_actual:
+                continue
+
+            # Convertir hora_inicio y hora_fin a objetos time
+            hora_inicio = datetime.strptime(horario["hora_inicio"], "%H:%M").time()
+            hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()
+            #print (f"[TRANSMISION] Horario inicio: {hora_inicio}, Horario fin: {hora_fin}")
+            #print (f"[TRANSMISION] Hora actual: {hora_actual}")
+            # Comparar si la hora actual está dentro del rango
+            if hora_inicio <= hora_actual <= hora_fin:
+                return clase["id_clase"]
+            # Si detener=True, verificar si la clase ya terminó
+            if detener and hora_actual > hora_fin:
+                return None
+
+    return None
+
+
+def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> None:
+    """
+    Crea un registro de asistencia si no existe para la clase, fecha y aula.
+    Inicializa con los estudiantes de la clase como 'ausente'.
+    """
+    # Verificar si ya existe un registro de asistencia
+    asistencia = get_asistencia(id_clase, fecha)
+    if asistencia:
+        return
+
+    # Obtener los estudiantes de la clase
+    estudiantes = get_estudiantes_by_clase(id_clase)
+    if not estudiantes:
+        return
+
+    # Crear registros iniciales para cada estudiante
+    registros = [
+        {
+            "id_estudiante": estudiante["id_estudiante"],
+            "estado": "ausente",
+            "confianza": None,
+            "fecha_deteccion": None,
+            "modificado_por_usuario": None,
+            "modificado_fecha": None
+        }
+        for estudiante in estudiantes
+    ]
+
+    # Crear el documento de asistencia
+    create_asistencia(id_clase, fecha, id_aula, registros)

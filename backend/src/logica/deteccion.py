@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-
+# src/logica/deteccion.py
 import cv2
 import numpy as np
 import torch
@@ -7,15 +6,15 @@ from insightface.app import FaceAnalysis
 from ultralytics.trackers.byte_tracker import BYTETracker
 from argparse import Namespace
 import time
-import os  # Añadimos esta importación para manejar directorios y archivos
-from src.logica.embeddings_generator import EmbeddingsGenerator  # Para pruebas
+import os
+from src.logica.embeddings_generator import EmbeddingsGenerator
+from src.logica.logger import logger
 
-# Configurar argumentos para BYTETracker
 args = Namespace(
     track_high_thresh=0.5,
     track_low_thresh=0.1,
     new_track_thresh=0.6,
-    track_buffer=60,  # Buffer para mantener tracks sin detección
+    track_buffer=60,
     match_thresh=0.8,
     fuse_score=False
 )
@@ -28,32 +27,27 @@ class Detections:
 
 class FaceTracker:
     def __init__(self, frame_rate=15, embeddings_dict=None):
-        print("🔹 Cargando modelo Buffalo para detección...")
+        logger.info("Cargando modelo Buffalo para detección...")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.detector = FaceAnalysis(name="buffalo_sc", providers=['CUDAExecutionProvider'] if self.device == 'cuda' else ['CPUExecutionProvider'])
         self.detector.prepare(ctx_id=0, det_size=(640, 480))
-        print(f"✅ Modelo cargado exitosamente en {self.device}.")
+        logger.info(f"Modelo cargado exitosamente en {self.device}.")
 
         self.tracker = BYTETracker(args, frame_rate=frame_rate)
-        print("✅ Tracker BYTETracker inicializado.")
+        logger.info("Tracker BYTETracker inicializado.")
 
         self.frame_count = 0
         self.fps_start_time = time.time()
         self.last_faces = []
-        self.embeddings_dict = embeddings_dict  # Diccionario de embeddings de alumnos de MongoDB
-        self.identified_faces = {}  # Mapea track_id -> id_estudiante
-    
+        self.embeddings_dict = embeddings_dict
+        self.identified_faces = {}
+
     def identify_faces(self, faces, tracked_objects):
-        """
-        Compara los embeddings de los rostros detectados con los almacenados y asigna nombres.
-        :param faces: Lista de rostros detectados por insightface.
-        :param tracked_objects: Lista de objetos rastreados por BYTETracker.
-        :return: Diccionario con track_id -> nombre asignado.
-        """
+        logger.debug(f"Identificando rostros: {len(faces)} rostros detectados, {len(tracked_objects)} objetos rastreados")
         identified_names = {}
-        if self.embeddings_dict and faces and len(tracked_objects) > 0:  # Verificar que haya datos
-            # Crear un mapa de índices de detección a track_id
-            track_map = {track[-1]: track[-4] for track in tracked_objects if track[-1] >= 0}  # idx -> track_id
+        if self.embeddings_dict and faces and len(tracked_objects) > 0:
+            track_map = {track[-1]: track[-4] for track in tracked_objects if track[-1] >= 0}
+            logger.debug(f"Mapa de tracks: {track_map}")
 
             for i, face in enumerate(faces):
                 if i in track_map:
@@ -73,19 +67,22 @@ class FaceTracker:
 
                     if best_similarity > 0.5:
                         identified_names[track_id] = best_match_id
+                        logger.debug(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
                     else:
                         identified_names[track_id] = "Desconocido"
+                        logger.debug(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
 
         return identified_names
 
     def process_frame(self, frame):
         self.frame_count += 1
+        logger.debug(f"Procesando frame {self.frame_count}")
 
-        # Redimensionar frame
         frame_resized = cv2.resize(frame, (640, 480))
+        logger.debug("Frame redimensionado a 640x480")
 
-        # Detectar rostros en cada frame
         faces = self.detector.get(frame_resized)
+        logger.debug(f"Rostros detectados: {len(faces)}")
 
         if faces:
             self.last_faces = faces
@@ -102,35 +99,24 @@ class FaceTracker:
         else:
             detections = Detections(xywh=np.zeros((0, 4)), conf=np.zeros(0), cls=np.zeros(0))
 
-        # Actualizar tracker
         tracked_objects = self.tracker.update(detections)
+        logger.debug(f"Objetos rastreados: {len(tracked_objects)}")
 
-        # Mapear los objetos rastreados
         face_assignments = {}
         for track in tracked_objects:
             x, y, w, h, track_id, score, cls, idx = track
-            # Usar las coordenadas predichas por BYTETracker directamente
             x1 = int(x - w / 2)
             y1 = int(y - h / 2)
             x2 = int(x + w / 2)
             y2 = int(y + h / 2)
             face_assignments[track_id] = np.array([x1, y1, x2, y2])
 
-            # Opcional: Si hay detección actual, corregir con insightface
             if faces and 0 <= idx < len(faces):
                 face = faces[int(idx)]
                 face_assignments[track_id] = face.bbox.astype(int)
 
-        # Identificar rostros
         identified_names = self.identify_faces(faces, tracked_objects)
 
-        # Directorio para guardar rostros identificados
-        """"
-        output_dir = "C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/rostros_identificados"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)  # Crear el directorio si no existe
-        """
-        # Dibujar los objetos rastreados
         for track_id, bbox in face_assignments.items():
             x1, y1, x2, y2 = bbox
             x1 = max(0, x1)
@@ -138,51 +124,34 @@ class FaceTracker:
             x2 = min(640, x2)
             y2 = min(480, y2)
 
-            # Color del rectángulo: verde para conocidos, rojo para desconocidos
-            color = (0, 255, 0)  # Verde por defecto
+            color = (0, 255, 0)
             if track_id in identified_names and identified_names[track_id] == "Desconocido":
-                color = (0, 0, 255)  # Rojo para "Desconocido"
-            
+                color = (0, 0, 255)
+
             cv2.rectangle(frame_resized, (x1, y1), (x2, y2), color, 2)
 
             label = f"ID: {track_id}"
             if track_id in identified_names:
                 label += f" - {identified_names[track_id]}"
-                """
-                # Guardar el rostro si es conocido (no "Desconocido")
-                if identified_names[track_id] != "Desconocido":
-                    # Extraer la región del rostro del frame
-                    face_region = frame_resized[y1:y2, x1:x2]
-                    if face_region.size > 0:  # Verificar que la región no esté vacía
-                        output_path = os.path.join(output_dir, f"ID{track_id}_{identified_names[track_id]}_{self.frame_count}.jpg")
-                        cv2.imwrite(output_path, face_region)
-                        print(f"💾 Rostro guardado: {output_path}")
-                """
             cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            
-        # Calcular y mostrar FPS
+
         elapsed_time = time.time() - self.fps_start_time
         if elapsed_time > 0:
             fps = self.frame_count / elapsed_time
             cv2.putText(frame_resized, f"FPS: {fps:.2f}", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        
-        self.identified_faces = identified_names  # Guardar para uso externo
 
+        self.identified_faces = identified_names
+        logger.debug("Frame procesado exitosamente")
         return frame_resized
 
 if __name__ == "__main__":
-    # Ruta fija del video (ajústala según tu archivo)
-    VIDEO_PATH = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\video\video_1.mp4" 
-
-    # Ruta fija del directorio de imágenes
+    VIDEO_PATH = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\video\video_1.mp4"
     IMAGES_DIR = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\imagenes"
 
-    # Cargar embeddings
     embeddings_gen = EmbeddingsGenerator(IMAGES_DIR)
     embeddings_dict = embeddings_gen.load_and_generate_embeddings()
 
-    # Crear instancia del tracker con los embeddings
     tracker = FaceTracker(embeddings_dict=embeddings_dict)
 
     print("🌟 Selecciona la fuente de video:")

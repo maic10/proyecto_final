@@ -1,8 +1,9 @@
 # src/servidor/api/auth.py
 from flask_restx import Resource, fields
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from src.servidor.api import ns, mongo
+from src.servidor.api import ns
 from src.modelos.usuario import usuario_model
+from src.logica.database import usuarios_collection
 import bcrypt
 
 # Modelo de solicitud para el inicio de sesión
@@ -33,38 +34,22 @@ class IniciarSesionResource(Resource):
     @ns.response(200, "Inicio de sesión exitoso", login_response_model)
     @ns.response(401, "Credenciales inválidas")
     def post(self):
-        """Inicia sesión y devuelve un token JWT"""
         data = ns.payload
-        # print("Datos recibidos:", data)
-        
-        # Busca en la DB el usuario con el correo ingresado
-        usuario = mongo.db.usuarios.find_one({"correo": data["correo"]})
-        # print("Usuario encontrado:", usuario)
-        
+        usuario = usuarios_collection.find_one({"correo": data["correo"]})
         if usuario:
-            # Verificar que el usuario coincide con la estructura de usuario_model
-            expected_fields = usuario_model.keys()  # Usamos .keys() para obtener los nombres de los campos
-            #print("Campos esperados:", expected_fields)
-            #print("Campos del usuario:", usuario.keys())
+            expected_fields = usuario_model.keys()
             if not all(field in usuario for field in expected_fields):
-               # #print("Estructura de usuario inválida")
                 return {"mensaje": "Estructura de usuario inválida en la base de datos"}, 500
-            
-            # Asegurarse de que la contraseña almacenada sea bytes
+
             contraseña_almacenada = usuario["contraseña"]
             if isinstance(contraseña_almacenada, str):
                 contraseña_almacenada = contraseña_almacenada.encode("utf-8")
-            
-            #print("Contraseña ingresada:", data["contraseña"])
-            #print("Contraseña almacenada:", contraseña_almacenada)
+
             if bcrypt.checkpw(data["contraseña"].encode("utf-8"), contraseña_almacenada):
-               # print("Autenticación exitosa")
-                # Generar un token JWT con el id_usuario y el rol del usuario
                 token = create_access_token(
                     identity=usuario["id_usuario"],
                     additional_claims={"rol": usuario["rol"]}
                 )
-               # print("Token generado:", token)
                 return {
                     "token": token,
                     "id_usuario": usuario["id_usuario"],
@@ -81,21 +66,13 @@ class PerfilResource(Resource):
     @ns.response(200, "Datos del usuario")
     @ns.response(404, "Usuario no encontrado")
     def get(self):
-        """Obtiene los datos del usuario autenticado"""
         id_usuario = get_jwt_identity()
-        #print("ID del usuario autenticado:", id_usuario)
-        
-        usuario = mongo.db.usuarios.find_one({"id_usuario": id_usuario})
+        usuario = usuarios_collection.find_one({"id_usuario": id_usuario})
         if not usuario:
-           # print("Usuario no encontrado")
             return {"mensaje": "Usuario no encontrado"}, 404
-        
-        expected_fields = usuario_model.keys()  # Usamos .keys() para obtener los nombres de los campos
-       # print("Campos esperados:", expected_fields)
-       # print("Campos del usuario:", usuario.keys())
+
+        expected_fields = usuario_model.keys()
         if not all(field in usuario for field in expected_fields):
-           # print("Estructura de usuario inválida")
             return {"mensaje": "Estructura de usuario inválida en la base de datos"}, 500
-        
-       # print("Usuario encontrado:", usuario)
+
         return usuario, 200

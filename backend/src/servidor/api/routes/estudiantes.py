@@ -1,7 +1,8 @@
 from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required
-from src.servidor.api import ns, mongo
+from src.servidor.api import ns
 from src.modelos.estudiante import estudiante_model
+from src.logica.database import get_estudiantes_by_clase
 
 @ns.route("/estudiantes")
 class EstudiantesResource(Resource):
@@ -16,9 +17,5 @@ class EstudiantesResource(Resource):
         args = parser.parse_args()
         class_id = args["class_id"]
 
-        if class_id:
-            estudiantes = list(mongo.db.estudiantes.find({"ids_clases": class_id}))
-        else:
-            estudiantes = list(mongo.db.estudiantes.find())
-
-        return estudiantes
+        return get_estudiantes_by_clase(class_id)
+       

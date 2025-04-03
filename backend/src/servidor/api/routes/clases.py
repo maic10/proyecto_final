@@ -1,8 +1,10 @@
 # src/servidor/api/clases.py
 from flask_restx import Resource, Namespace
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.servidor.api import ns, mongo
+from src.servidor.api import ns
 from src.modelos.clase import clase_model
+from src.logica.database import get_user_by_id,get_clases_to_profesor_by_id
+
 
 @ns.route("/clases")
 class ClasesResource(Resource):
@@ -13,7 +15,8 @@ class ClasesResource(Resource):
         """Obtiene las clases de un profesor"""
         # Obtener el ID del usuario autenticado
         identity = get_jwt_identity()
-        user = mongo.db.usuarios.find_one({"id_usuario": identity})
+        user =get_user_by_id(identity)
+
         if not user or user["rol"] != "profesor":
             return {"mensaje": "Acceso denegado"}, 403
 
@@ -26,5 +29,5 @@ class ClasesResource(Resource):
             return {"mensaje": "No puedes consultar clases de otro profesor"}, 403
 
         # Buscar las clases del profesor
-        clases = mongo.db.clases.find({"id_usuario": id_usuario})
+        clases = get_clases_to_profesor_by_id(id_usuario) 
         return list(clases), 200
