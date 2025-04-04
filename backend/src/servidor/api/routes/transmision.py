@@ -1,8 +1,9 @@
 # src/servidor/api/routes/transmision.py
 from flask import request, jsonify
-from flask_restx import Resource
+from flask_restx import Resource, reqparse
 from datetime import datetime
 from src.servidor.api import ns
+from flask_jwt_extended import jwt_required
 from src.servidor.video.receptor import iniciar_transmision_para_clase, detener_transmision, hay_transmision_activa
 from src.logica.utils import (
     obtener_clase_activa_para_aula,
@@ -110,3 +111,18 @@ class EstadoTransmision(Resource):
 
         logger.info(f"Transmisión en curso para clase {id_clase} y RPI {id_rpi}")
         return {"transmitir": True, "id_clase": id_clase}, 200
+    
+
+@ns.route("/estado_web")
+class EstadoTransmisionWeb(Resource):
+    @jwt_required()
+    @ns.doc(params={"id_clase": "ID de la clase"})
+    def get(self):
+        """Verifica si hay una transmisión activa para una clase (para el frontend)"""
+        parser = reqparse.RequestParser()
+        parser.add_argument("id_clase", type=str, required=True)
+        args = parser.parse_args()
+
+        id_clase = args["id_clase"]
+        transmitir = hay_transmision_activa(id_clase)
+        return {"transmitir": transmitir}, 200

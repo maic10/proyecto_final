@@ -9,7 +9,7 @@ from src.logica.logger import logger
 
 @ns.route("/transmision/video/<string:id_clase>")
 class VideoStreamRoute(Resource):
-    #@jwt_required()  Desactivar temporalmente la autenticación JWT para pruebas
+    #@jwt_required()  #Desactivar temporalmente la autenticación JWT para pruebas
     def get(self, id_clase):
         if not hay_transmision_activa(id_clase):
             logger.warning(f"No hay transmisión activa para clase {id_clase}")
@@ -21,22 +21,3 @@ class VideoStreamRoute(Resource):
             mimetype='multipart/x-mixed-replace; boundary=frame'
         )
 
-"""
-from flask import Response
-from flask_restx import Resource
-from src.servidor.api import ns
-from src.servidor.video.receptor import generar_frames, hay_transmision_activa
-
-@ns.route("/transmision/video")
-class VideoStreamRoute(Resource):
-    def get(self):
-        id_clase= clase_001
-        if not hay_transmision_activa(id_clase):
-            return {"error": "No hay transmisión activa"}, 503
-        
-        return Response(
-            generar_frames(id_clase),
-            mimetype='multipart/x-mixed-replace; boundary=frame'
-        )
-
-"""

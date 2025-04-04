@@ -1,4 +1,4 @@
-# src/logica/deteccion.py
+# src/logica/detecciones.py
 import cv2
 import numpy as np
 import torch
@@ -40,11 +40,11 @@ class FaceTracker:
         self.fps_start_time = time.time()
         self.last_faces = []
         self.embeddings_dict = embeddings_dict
-        self.identified_faces = {}
+        self.identified_faces = {}  # Diccionario para (nombre, confianza)
 
     def identify_faces(self, faces, tracked_objects):
         logger.debug(f"Identificando rostros: {len(faces)} rostros detectados, {len(tracked_objects)} objetos rastreados")
-        identified_names = {}
+        identified = {}
         if self.embeddings_dict and faces and len(tracked_objects) > 0:
             track_map = {track[-1]: track[-4] for track in tracked_objects if track[-1] >= 0}
             logger.debug(f"Mapa de tracks: {track_map}")
@@ -66,13 +66,14 @@ class FaceTracker:
                                 best_match_id = alumno_id
 
                     if best_similarity > 0.5:
-                        identified_names[track_id] = best_match_id
+                        identified[track_id] = (best_match_id, best_similarity)
                         logger.debug(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
                     else:
-                        identified_names[track_id] = "Desconocido"
+                        identified[track_id] = ("Desconocido", best_similarity)
                         logger.debug(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
 
-        return identified_names
+        self.identified_faces = identified
+        return identified
 
     def process_frame(self, frame):
         self.frame_count += 1
@@ -115,7 +116,7 @@ class FaceTracker:
                 face = faces[int(idx)]
                 face_assignments[track_id] = face.bbox.astype(int)
 
-        identified_names = self.identify_faces(faces, tracked_objects)
+        identified = self.identify_faces(faces, tracked_objects)
 
         for track_id, bbox in face_assignments.items():
             x1, y1, x2, y2 = bbox
@@ -125,14 +126,14 @@ class FaceTracker:
             y2 = min(480, y2)
 
             color = (0, 255, 0)
-            if track_id in identified_names and identified_names[track_id] == "Desconocido":
+            if track_id in identified and identified[track_id][0] == "Desconocido":
                 color = (0, 0, 255)
 
             cv2.rectangle(frame_resized, (x1, y1), (x2, y2), color, 2)
 
             label = f"ID: {track_id}"
-            if track_id in identified_names:
-                label += f" - {identified_names[track_id]}"
+            if track_id in identified:
+                label += f" - {identified[track_id][0]}"
             cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         elapsed_time = time.time() - self.fps_start_time
@@ -141,7 +142,6 @@ class FaceTracker:
             cv2.putText(frame_resized, f"FPS: {fps:.2f}", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
 
-        self.identified_faces = identified_names
         logger.debug("Frame procesado exitosamente")
         return frame_resized
 
@@ -154,29 +154,29 @@ if __name__ == "__main__":
 
     tracker = FaceTracker(embeddings_dict=embeddings_dict)
 
-    print("🌟 Selecciona la fuente de video:")
+    print("Selecciona la fuente de video:")
     print("  - Ingresa '0' para usar la cámara.")
     print("  - Ingresa '1' para usar el video predefinido.")
     choice = input("Tu elección (0 o 1): ")
 
     if choice == "0":
-        print("📷 Abriendo la cámara...")
+        print("Abriendo la cámara...")
         cap = cv2.VideoCapture(0)
     elif choice == "1":
-        print(f"🎥 Abriendo video: {VIDEO_PATH}")
+        print(f"Abriendo video: {VIDEO_PATH}")
         cap = cv2.VideoCapture(VIDEO_PATH)
     else:
-        print("❌ Opción inválida. Usa '0' o '1'.")
+        print("Opción inválida. Usa '0' o '1'.")
         exit()
 
     if not cap.isOpened():
-        print("❌ Error: No se pudo abrir la fuente de video.")
+        print("Error: No se pudo abrir la fuente de video.")
         exit()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            print("ℹ️ Fin del video o error al leer el frame.")
+            print("Fin del video o error al leer el frame.")
             break
 
         processed_frame = tracker.process_frame(frame)

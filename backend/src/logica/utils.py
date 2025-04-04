@@ -1,9 +1,7 @@
 import numpy as np
 from datetime import datetime
-#from src.servidor.api import mongo
 import pytz
 from .logger import logger
-
 from src.logica.database import *
 
 # Ajustar el indice en DB
@@ -30,36 +28,50 @@ def cargar_embeddings_por_clase(id_clase):
 
 def registrar_asistencia_en_db(id_clase, id_estudiante, confianza):
     """
-    Registra asistencia en MongoDB, evitando duplicados.
+    Registra o actualiza la asistencia en MongoDB.
     :param id_clase: ID de la clase
     :param id_estudiante: ID del estudiante
     :param confianza: Nivel de similitud
     """
     fecha_actual = datetime.now().strftime("%Y-%m-%d")
-    doc = get_asistencia(id_clase, fecha_actual)
+    doc = get_asistencia(id_clase, fecha_actual)  # Corregido: Usar get_asistencia
     if not doc:
         logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha_actual}")
         return
 
-    ya_registrado = any(r["id_estudiante"] == id_estudiante for r in doc["registros"])
-    if ya_registrado:
-        logger.info(f"Estudiante {id_estudiante} ya registrado para clase {id_clase}")
+    registros = doc["registros"]
+    estudiante_encontrado = None
+    for registro in registros:
+        if registro["id_estudiante"] == id_estudiante:
+            estudiante_encontrado = registro
+            break
+
+    if estudiante_encontrado:
+        # Si el estudiante ya está registrado como "confirmado", actualizar solo si la confianza es mayor
+        if estudiante_encontrado["estado"] == "confirmado":
+            if confianza > estudiante_encontrado["confianza"]:
+                estudiante_encontrado["confianza"] = confianza
+                estudiante_encontrado["fecha_deteccion"] = datetime.utcnow().isoformat() + "Z"
+                logger.info(f"Actualizando asistencia de estudiante {id_estudiante} con confianza {confianza:.2f} para clase {id_clase}")
+                update_asistencia(id_clase, fecha_actual, registros)
+            else:
+                logger.debug(f"Estudiante {id_estudiante} ya registrado con confianza mayor ({estudiante_encontrado['confianza']:.2f} > {confianza:.2f})")
+            return
+    else:
+        # Si el estudiante no está en los registros, debería estarlo (fue inicializado como "ausente")
+        logger.warning(f"Estudiante {id_estudiante} no encontrado en registros de clase {id_clase}")
         return
 
-    nuevo_registro = {
-        "id_estudiante": id_estudiante,
-        "estado": "confirmado",
-        "confianza": confianza,
-        "fecha_deteccion": datetime.utcnow().isoformat() + "Z",
-        "modificado_por_usuario": None,
-        "modificado_fecha": None
-    }
+    # Actualizar el estado a "confirmado" si no estaba confirmado
+    estudiante_encontrado["estado"] = "confirmado"
+    estudiante_encontrado["confianza"] = confianza
+    estudiante_encontrado["fecha_deteccion"] = datetime.utcnow().isoformat() + "Z"
+    estudiante_encontrado["modificado_por_usuario"] = None
+    estudiante_encontrado["modificado_fecha"] = None
 
-    doc["registros"].append(nuevo_registro)
-    update_asistencia(id_clase, fecha_actual, doc["registros"])
+    update_asistencia(id_clase, fecha_actual, registros)
     logger.info(f"Estudiante {id_estudiante} registrado con confianza {confianza:.2f} para clase {id_clase}")
-
-
+    
 """"
 "" /transmision/iniciar"
 """

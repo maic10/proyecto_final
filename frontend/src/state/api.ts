@@ -109,3 +109,39 @@ export async function exportarAsistenciasExcel(
   link.click();
   document.body.removeChild(link);
 }
+
+export async function obtenerAsistencias(idClase: string) {
+  const token = obtenerToken();
+  const res = await axios.get(`${API_BASE}/asistencias/${idClase}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function obtenerAsistenciasActual(idClase: string, fecha: string) {
+  const token = obtenerToken();
+  const res = await axios.get(`${API_BASE}/asistencias/actual`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { id_clase: idClase, fecha }
+  });
+  return res.data;
+}
+
+export async function actualizarEstadoAsistencia(idEstudiante: string, idClase: string, fecha: string, estado: string) {
+  const token = obtenerToken();
+  const res = await axios.put(
+    `${API_BASE}/asistencias/${idEstudiante}`,
+    { id_clase: idClase, fecha, estado },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return res.data;
+}
+
+export async function verificarEstadoTransmision(idClase: string) {
+  const token = obtenerToken();
+  const res = await axios.get(`${API_BASE}/estado_web`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { id_clase: idClase }
+  });
+  return res.data;
+}
