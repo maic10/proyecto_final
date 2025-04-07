@@ -13,7 +13,7 @@ from src.logica.utils import (
 )
 
 MODO_LOCAL = True
-MODO_LOCAL_CAMARA = False
+MODO_LOCAL_CAMARA = False # Cambiar a False para usar un video pregrabado
 VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
 
 transmisiones = {}
@@ -119,24 +119,12 @@ def _recepcion_loop_por_clase(id_clase, transmision):
                 detener_transmision(id_clase)
                 return
 
-            if MODO_LOCAL_CAMARA:
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-                cap.set(cv2.CAP_PROP_FPS, 25)
-                logger.info(f"Configuración de cámara: {width}x{height}, 25 FPS")
-
-            frame_count = 0
             while not transmision["detener_evento"].is_set():
-                logger.debug("Esperando a leer un frame de la cámara...")
                 ret, frame = cap.read()
                 if not ret:
                     logger.error("No se pudo leer un frame de la cámara")
                     break
 
-                frame_count += 1
-                logger.debug(f"Frame {frame_count} leído correctamente, dimensiones: {frame.shape}")
-
-                frame = cv2.resize(frame, (width, height))
                 procesado = tracker.process_frame(frame)
 
                 with transmision["lock"]:
@@ -155,8 +143,6 @@ def _recepcion_loop_por_clase(id_clase, transmision):
                 
                 video_pantalla(cv2,id_clase,procesado)
                 
-                time.sleep(1 / 25)
-
             logger.info("Bucle de recepción terminado")
             cap.release()
 
@@ -215,8 +201,7 @@ def _recepcion_loop_por_clase(id_clase, transmision):
                                         transmision["detecciones_temporales"][nombre] = confianza
                                 else:
                                     transmision["detecciones_temporales"][nombre] = confianza
-                    video_pantalla(cv2,id_clase,frame_procesado)
-                    time.sleep(1 / 25)
+                    video_pantalla(cv2,id_clase,frame_procesado)                    
 
             except Exception as e:
                 logger.error(f"No se pudo iniciar FFmpeg: {e}")

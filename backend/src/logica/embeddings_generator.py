@@ -1,3 +1,4 @@
+# /src/logica/embeddings_generator.py
 import os
 import cv2
 import json

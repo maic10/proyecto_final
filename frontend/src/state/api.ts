@@ -37,20 +37,6 @@ export async function obtenerEstudiantesPorClase(id_clase: string) {
   return res.data;
 }
 
-export async function obtenerHistorialAsistencias(id_clase: string, fecha_inicio: string, fecha_fin: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/asistencias/historial`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: {
-      clase: id_clase,
-      fecha_inicio,
-      fecha_fin
-    }
-  });
-  // res.data ya es la lista con { Fecha, Clase, Aula, Estudiante, ... }
-  return res.data;
-}
-
 export async function obtenerAsistenciasResumen(
   idClase: string, 
   fechaInicio?: string, 
@@ -144,4 +130,34 @@ export async function verificarEstadoTransmision(idClase: string) {
     params: { id_clase: idClase }
   });
   return res.data;
+}
+
+export async function obtenerAsistenciasEstudiante(
+  idClase: string,
+  idEstudiante: string,
+  fechaInicio?: string,
+  fechaFin?: string
+) {
+  const token = obtenerToken();
+  if (!token) {
+    console.error('Token no encontrado. Redirigiendo al login...');
+    throw new Error('No se encontró un token de autenticación');
+  }
+
+  const params: any = { id_clase: idClase, id_estudiante: idEstudiante };
+  if (fechaInicio && fechaFin) {
+    params.fecha_inicio = fechaInicio;
+    params.fecha_fin = fechaFin;
+  }
+
+  try {
+    const res = await axios.get(`${API_BASE}/asistencias/estudiante`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params
+    });
+    return res.data;
+  } catch (error) {
+    console.error('Error en obtenerAsistenciasEstudiante:', error.response?.data || error.message);
+    throw error;
+  }
 }

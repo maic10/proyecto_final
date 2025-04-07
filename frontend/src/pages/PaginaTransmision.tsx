@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../state/auth';
-import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision } from '../state/api';
+import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantesPorClase } from '../state/api';
 import { formatInTimeZone } from 'date-fns-tz';
 
 interface RegistroAsistencia {
@@ -14,23 +14,36 @@ interface RegistroAsistencia {
   modificado_fecha?: string | null;
 }
 
+interface Estudiante {
+  id_estudiante: string;
+  nombre: string;
+  apellido: string;
+}
+
+interface Clase {
+  id_clase: string;
+  nombre: string;
+}
+
 const API_BASE = 'http://127.0.0.1:5000/api';
 
 const PaginaTransmision: React.FC = () => {
-  const [idClase, setIdClase] = useState<string | null>(null); // Almacenar el id_clase dinámicamente
-   // Obtenemos la fecha actual en la zona horaria de Madrid
+  const [idClase, setIdClase] = useState<string | null>(null);
+  const [nombreClase, setNombreClase] = useState<string>('');
+  const [clases, setClases] = useState<Clase[]>([]);
   const fechaActual = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
   const navigate = useNavigate();
 
   const [registros, setRegistros] = useState<RegistroAsistencia[]>([]);
+  const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [hayTransmision, setHayTransmision] = useState(false);
   const [mostrarVideo, setMostrarVideo] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
-  // Cargar el id_clase al montar el componente
+  // Cargar id_clase, nombre de clase y estudiantes al montar el componente
   useEffect(() => {
-    const cargarClase = async () => {
+    const cargarDatosIniciales = async () => {
       const usuario = obtenerUsuario();
       if (!usuario) {
         navigate('/');
@@ -38,50 +51,63 @@ const PaginaTransmision: React.FC = () => {
       }
 
       try {
-        const clases = await obtenerClases(usuario.id_usuario);
-        if (clases.length > 0) {
-          setIdClase(clases[0].id_clase); // Tomar la primera clase del profesor
+        const clasesData = await obtenerClases(usuario.id_usuario);
+        if (clasesData.length > 0) {
+          setClases(clasesData);
+          const claseSeleccionada = clasesData[0];
+          setIdClase(claseSeleccionada.id_clase);
+          setNombreClase(claseSeleccionada.nombre);
+
+          const estudiantesData = await obtenerEstudiantesPorClase(claseSeleccionada.id_clase);
+          setEstudiantes(estudiantesData);
         } else {
           setError('No tienes clases asignadas.');
           setCargando(false);
         }
       } catch (err) {
-        console.error('Error al cargar las clases:', err);
-        setError('Error al cargar las clases del profesor.');
+        console.error('Error al cargar datos iniciales:', err);
+        setError('Error al cargar las clases o estudiantes.');
         setCargando(false);
       }
     };
 
-    cargarClase();
+    cargarDatosIniciales();
   }, [navigate]);
 
-  // Cargar el estado de la transmisión y las asistencias una vez que tengamos el id_clase
-  const cargarDatosIniciales = async () => {
-    if (!idClase) return; // No hacer nada si no tenemos id_clase
+  // Cargar estado inicial de transmisión y asistencias
+  const cargarDatosTransmision = async () => {
+    if (!idClase) return;
 
     setCargando(true);
     setError('');
     try {
-      // Verificar estado de la transmisión
       const estadoTransmision = await verificarEstadoTransmision(idClase);
       setHayTransmision(estadoTransmision.transmitir);
       setMostrarVideo(estadoTransmision.transmitir);
 
-      // Cargar asistencias actuales
-      const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
-      setRegistros(asistencia.registros || []);
+      if (estadoTransmision.transmitir) {
+        const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
+        setRegistros(asistencia.registros || []);
+      } else {
+        setRegistros([]);
+      }
     } catch (err) {
-      console.error('Error al cargar datos iniciales:', err);
-      setError('Error al cargar los datos iniciales');
+      console.error('Error al cargar datos de transmisión:', err);
+      setError('Error al cargar el estado de transmisión o asistencias');
     } finally {
       setCargando(false);
     }
   };
 
-  // Actualizar las asistencias periódicamente
   useEffect(() => {
     if (idClase) {
-      cargarDatosIniciales();
+      cargarDatosTransmision();
+    }
+  }, [idClase]);
+
+  // Actualizar asistencias solo cuando hay transmisión
+  useEffect(() => {
+    if (idClase && hayTransmision) {
       const intervalAsistencias = setInterval(async () => {
         try {
           const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
@@ -89,30 +115,34 @@ const PaginaTransmision: React.FC = () => {
         } catch (err) {
           console.error('Error al actualizar asistencias:', err);
         }
-      }, 5000); // Actualizar cada 5 segundos
+      }, 5000);
 
       return () => clearInterval(intervalAsistencias);
     }
-  }, [idClase]);
+  }, [idClase, hayTransmision]);
 
-  // Verificar el estado de la transmisión periódicamente
+  // Verificar estado de transmisión periódicamente
   useEffect(() => {
     if (idClase) {
       const intervalTransmision = setInterval(async () => {
         try {
           const estadoTransmision = await verificarEstadoTransmision(idClase);
           setHayTransmision(estadoTransmision.transmitir);
+          if (!estadoTransmision.transmitir) {
+            setRegistros([]);
+          }
         } catch (err) {
           console.error('Error al verificar estado de transmisión:', err);
           setHayTransmision(false);
+          setRegistros([]);
         }
-      }, 10000); // Verificar cada 10 segundos
+      }, 10000);
 
       return () => clearInterval(intervalTransmision);
     }
   }, [idClase]);
 
-  // Manejar el cambio de estado de un estudiante
+  // Manejar cambio de estado
   const handleCorregirEstado = async (idEstudiante: string, nuevoEstado: string) => {
     if (!idClase) return;
 
@@ -126,9 +156,22 @@ const PaginaTransmision: React.FC = () => {
     }
   };
 
+  // Obtener nombre completo del estudiante
+  const obtenerNombreEstudiante = (idEstudiante: string) => {
+    const estudiante = estudiantes.find((e) => e.id_estudiante === idEstudiante);
+    return estudiante ? `${estudiante.nombre} ${estudiante.apellido}` : idEstudiante;
+  };
+
+  // Formatear fecha_deteccion a un formato legible
+  const formatearFechaDeteccion = (fecha: string | null) => {
+    if (!fecha) return 'N/A';
+    const fechaObj = new Date(fecha);
+    return formatInTimeZone(fechaObj, 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
+  };
+
   return (
     <div className="container py-4">
-      <h2 className="mb-4">Transmisión en Tiempo Real {idClase ? `- Clase ${idClase}` : ''}</h2>
+      <h2 className="mb-4">Transmisión en Tiempo Real {nombreClase ? `- ${nombreClase}` : ''}</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
       {cargando && <p>Cargando datos...</p>}
@@ -177,7 +220,6 @@ const PaginaTransmision: React.FC = () => {
                   <tr>
                     <th>Estudiante</th>
                     <th>Estado</th>
-                    <th>Confianza</th>
                     <th>Fecha de Detección</th>
                     <th>Acción</th>
                   </tr>
@@ -185,10 +227,9 @@ const PaginaTransmision: React.FC = () => {
                 <tbody>
                   {registros.map((registro) => (
                     <tr key={registro.id_estudiante}>
-                      <td>{registro.id_estudiante}</td>
+                      <td>{obtenerNombreEstudiante(registro.id_estudiante)}</td>
                       <td>{registro.estado}</td>
-                      <td>{registro.confianza ? registro.confianza.toFixed(2) : 'N/A'}</td>
-                      <td>{registro.fecha_deteccion || 'N/A'}</td>
+                      <td>{formatearFechaDeteccion(registro.fecha_deteccion)}</td>
                       <td>
                         <select
                           value={registro.estado}
@@ -196,7 +237,6 @@ const PaginaTransmision: React.FC = () => {
                           className="form-select"
                         >
                           <option value="confirmado">Confirmado</option>
-                          <option value="duda">Duda</option>
                           <option value="ausente">Ausente</option>
                         </select>
                       </td>

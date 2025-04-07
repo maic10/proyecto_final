@@ -2,7 +2,7 @@ from flask_restx import Resource, reqparse, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns, mongo
 from src.modelos.asistencia import asistencia_model
-from src.logica.database import get_asistencia, update_asistencia, get_clase_by_id, get_aula_by_id, create_asistencia
+from src.logica.database import get_asistencia, update_asistencia, get_clase_by_id, get_aula_by_id, create_asistencia,asistencias_collection,estudiantes_collection
 from datetime import datetime
 from datetime import datetime
 import pandas as pd
@@ -299,3 +299,69 @@ class RegistrarAsistenciaResource(Resource):
             ]
             create_asistencia(id_clase, fecha, id_aula, registros)
             return {"mensaje": "Asistencia registrada"}, 201
+
+@ns.route("/asistencias/estudiante")
+class AsistenciasEstudianteResource(Resource):
+    @jwt_required()
+    @ns.doc(params={
+        "id_clase": "ID de la clase (requerido)",
+        "id_estudiante": "ID del estudiante (requerido)",
+        "fecha_inicio": "Fecha mínima (YYYY-MM-DD, opcional)",
+        "fecha_fin": "Fecha máxima (YYYY-MM-DD, opcional)"
+    })
+    def get(self):
+        """
+        Devuelve todas las asistencias de un estudiante para una clase en un rango de fechas,
+        junto con un resumen de asistencias y ausencias.
+        """
+        parser = reqparse.RequestParser()
+        parser.add_argument("id_clase", type=str, required=True)
+        parser.add_argument("id_estudiante", type=str, required=True)
+        parser.add_argument("fecha_inicio", type=str, required=False)
+        parser.add_argument("fecha_fin", type=str, required=False)
+        args = parser.parse_args()
+
+        # Construimos la query para filtrar
+        query = {
+            "id_clase": args["id_clase"],
+            "registros": {
+                "$elemMatch": {
+                    "id_estudiante": args["id_estudiante"]
+                }
+            }
+        }
+
+        if args["fecha_inicio"] and args["fecha_fin"]:
+            query["fecha"] = {
+                "$gte": args["fecha_inicio"],
+                "$lte": args["fecha_fin"]
+            }
+
+        cursor = asistencias_collection.find(query).sort("fecha", -1)
+        asistencias = []
+        asistidas = 0
+        ausentes = 0
+
+        for doc in cursor:
+            #logger.info(f"Documento encontrado: {doc}")  # Depuración
+            for registro in doc.get("registros", []):
+                if registro["id_estudiante"] == args["id_estudiante"]:
+                    asistencias.append({
+                        "fecha": doc["fecha"],
+                        "estado": registro["estado"]
+                    })
+                    if registro["estado"] == "confirmado":
+                        asistidas += 1
+                    elif registro["estado"] == "ausente":
+                        ausentes += 1
+
+        resultado = {
+            "asistencias": asistencias,
+            "resumen": {
+                "asistidas": asistidas,
+                "ausentes": ausentes
+            }
+        }
+
+        #logger.info(f"Resultado para id_estudiante={args['id_estudiante']}: {resultado}")  # Depuración
+        return resultado, 200

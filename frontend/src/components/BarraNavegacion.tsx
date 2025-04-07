@@ -33,9 +33,6 @@ function BarraNavegacion() {
               <NavLink to="/asistencias" className="nav-link">Asistencias</NavLink>
             </li>
             <li className="nav-item">
-              <NavLink to="/horario" className="nav-link">Horario</NavLink>
-            </li>
-            <li className="nav-item">
               <NavLink to="/perfil" className="nav-link">Perfil</NavLink>
             </li>
           </ul>
