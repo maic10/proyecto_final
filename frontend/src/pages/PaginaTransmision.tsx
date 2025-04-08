@@ -5,6 +5,14 @@ import { obtenerUsuario } from '../state/auth';
 import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantesPorClase } from '../state/api';
 import { formatInTimeZone } from 'date-fns-tz';
 
+interface Horario {
+  dia: string;
+  hora_inicio: string;
+  hora_fin: string;
+  id_aula: string;
+  nombre_aula: string;
+}
+
 interface RegistroAsistencia {
   id_estudiante: string;
   estado: string;
@@ -22,7 +30,8 @@ interface Estudiante {
 
 interface Clase {
   id_clase: string;
-  nombre: string;
+  nombre_asignatura: string;
+  horarios: Horario[];
 }
 
 const API_BASE = 'http://127.0.0.1:5000/api';
@@ -41,7 +50,7 @@ const PaginaTransmision: React.FC = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
-  // Cargar id_clase, nombre de clase y estudiantes al montar el componente
+  // Cargar clases y determinar la clase activa o más próxima
   useEffect(() => {
     const cargarDatosIniciales = async () => {
       const usuario = obtenerUsuario();
@@ -52,16 +61,99 @@ const PaginaTransmision: React.FC = () => {
 
       try {
         const clasesData = await obtenerClases(usuario.id_usuario);
-        if (clasesData.length > 0) {
-          setClases(clasesData);
-          const claseSeleccionada = clasesData[0];
-          setIdClase(claseSeleccionada.id_clase);
-          setNombreClase(claseSeleccionada.nombre);
+        if (clasesData.length === 0) {
+          setError('No tienes clases asignadas.');
+          setCargando(false);
+          return;
+        }
 
+        setClases(clasesData);
+
+        const ahora = new Date();
+        const diaActual = ahora.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+        const diasSemana = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds(); // Hora actual en segundos
+
+        let claseActiva: Clase | null = null;
+        let claseMasProxima: Clase | null = null;
+        let fechaInicioMasProxima: Date | null = null;
+
+        // 1. Buscar una clase activa en el momento actual
+        for (const clase of clasesData) {
+          for (const horario of clase.horarios) {
+            const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+            if (diaHorario !== diaActual) continue;
+
+            const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
+            const [horaFin, minutosFin] = horario.hora_fin.split(':').map(Number);
+            const inicioSegundos = horaInicio * 3600 + minutosInicio * 60;
+            let finSegundos = horaFin * 3600 + minutosFin * 60;
+
+            // Manejar horarios que cruzan la medianoche
+            const cruzaMedianoche = finSegundos < inicioSegundos;
+            if (cruzaMedianoche) {
+              // Si cruza la medianoche, el horario termina el día siguiente
+              if (horaActual >= inicioSegundos || horaActual <= finSegundos) {
+                // Verificar si hay transmisión activa para esta clase
+                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
+                if (estadoTransmision.transmitir) {
+                  claseActiva = clase;
+                  break;
+                }
+              }
+            } else {
+              // Caso normal: horario dentro del mismo día
+              if (inicioSegundos <= horaActual && horaActual <= finSegundos) {
+                // Verificar si hay transmisión activa para esta clase
+                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
+                if (estadoTransmision.transmitir) {
+                  claseActiva = clase;
+                  break;
+                }
+              }
+            }
+          }
+          if (claseActiva) break;
+        }
+
+        // 2. Si no hay clase activa, buscar la clase más próxima a empezar
+        if (!claseActiva) {
+          for (const clase of clasesData) {
+            for (const horario of clase.horarios) {
+              const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+              const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
+              const fechaInicio = new Date(ahora);
+              fechaInicio.setHours(hora, minutos, 0, 0);
+
+              // Ajustar el día al próximo día de la semana correspondiente
+              const diasDiferencia = (diaHorario - diaActual + 7) % 7;
+              if (diasDiferencia === 0 && fechaInicio < ahora) {
+                // Si es hoy pero ya pasó, añadir una semana
+                fechaInicio.setDate(fechaInicio.getDate() + 7);
+              } else {
+                fechaInicio.setDate(fechaInicio.getDate() + diasDiferencia);
+              }
+
+              // Comparar para encontrar la fecha más próxima
+              if (!fechaInicioMasProxima || fechaInicio < fechaInicioMasProxima) {
+                fechaInicioMasProxima = fechaInicio;
+                claseMasProxima = clase;
+              }
+            }
+          }
+        }
+
+        // Seleccionar la clase activa o la más próxima
+        const claseSeleccionada = claseActiva || claseMasProxima;
+        if (claseSeleccionada) {
+          setIdClase(claseSeleccionada.id_clase);
+          setNombreClase(claseSeleccionada.nombre_asignatura);
+
+          // Cargar estudiantes de la clase seleccionada
           const estudiantesData = await obtenerEstudiantesPorClase(claseSeleccionada.id_clase);
           setEstudiantes(estudiantesData);
         } else {
-          setError('No tienes clases asignadas.');
+          setError('No hay clases próximas programadas.');
           setCargando(false);
         }
       } catch (err) {

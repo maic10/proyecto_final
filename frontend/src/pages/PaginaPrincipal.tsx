@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { obtenerPerfil, obtenerClases } from '../state/api';
 import { obtenerUsuario } from '../state/auth';
+import ClaseCard from '../components/ClaseCard';
 
 interface Horario {
   dia: string;
@@ -14,14 +15,16 @@ interface Horario {
 
 interface Clase {
   id_clase: string;
-  nombre: string;
+  id_asignatura: string;
+  nombre_asignatura: string;
   horarios: Horario[];
 }
 
 function PaginaPrincipal() {
   const [nombre, setNombre] = useState('');
-  const [clase, setClase] = useState<Clase | null>(null);
-  const [proximaClase, setProximaClase] = useState<{ horario: Horario; tiempoRestante: string } | null>(null);
+  const [clases, setClases] = useState<Clase[]>([]);
+  const [claseActiva, setClaseActiva] = useState<{ clase: Clase; horario: Horario } | null>(null);
+  const [proximaClase, setProximaClase] = useState<{ clase: Clase; horario: Horario; tiempoRestante: string } | null>(null);
   const [cargando, setCargando] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,9 +41,7 @@ function PaginaPrincipal() {
       setNombre(perfil.name);
 
       const clasesData = await obtenerClases(usuario.id_usuario);
-      if (clasesData.length > 0) {
-        setClase(clasesData[0]); // Solo tomamos la primera clase
-      }
+      setClases(clasesData);
     } catch (error) {
       console.error('Error al cargar datos:', error);
       navigate('/');
@@ -49,41 +50,86 @@ function PaginaPrincipal() {
     }
   };
 
-  // Calcular la próxima clase y actualizar el temporizador
+  // Calcular clase activa o próxima y actualizar el temporizador
   useEffect(() => {
-    if (clase) {
-      const calcularProximaClase = () => {
+    if (clases.length > 0) {
+      const calcularClaseActivaOProxima = () => {
         const ahora = new Date();
         const diaActual = ahora.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
         const diasSemana = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds(); // Hora actual en segundos
 
-        // Mapear horarios a fechas futuras
-        const horariosFuturos = clase.horarios.map((horario) => {
-          const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
-          const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
-          const fechaInicio = new Date(ahora);
-          fechaInicio.setHours(hora, minutos, 0, 0);
+        // 1. Buscar una clase activa en el momento actual
+        let claseActivaEncontrada: { clase: Clase; horario: Horario } | null = null;
+        for (const clase of clases) {
+          for (const horario of clase.horarios) {
+            const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+            if (diaHorario !== diaActual) continue;
 
-          // Ajustar el día al próximo día de la semana correspondiente
-          const diasDiferencia = (diaHorario - diaActual + 7) % 7;
-          if (diasDiferencia === 0 && fechaInicio < ahora) {
-            // Si es hoy pero ya pasó, añadir una semana
-            fechaInicio.setDate(fechaInicio.getDate() + 7);
-          } else {
-            fechaInicio.setDate(fechaInicio.getDate() + diasDiferencia);
+            const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
+            const [horaFin, minutosFin] = horario.hora_fin.split(':').map(Number);
+            const inicioSegundos = horaInicio * 3600 + minutosInicio * 60;
+            let finSegundos = horaFin * 3600 + minutosFin * 60;
+
+            // Manejar horarios que cruzan la medianoche
+            const cruzaMedianoche = finSegundos < inicioSegundos;
+            if (cruzaMedianoche) {
+              // Si cruza la medianoche, el horario termina el día siguiente
+              if (horaActual >= inicioSegundos || horaActual <= finSegundos) {
+                claseActivaEncontrada = { clase, horario };
+                break;
+              }
+            } else {
+              // Caso normal: horario dentro del mismo día
+              if (inicioSegundos <= horaActual && horaActual <= finSegundos) {
+                claseActivaEncontrada = { clase, horario };
+                break;
+              }
+            }
           }
+          if (claseActivaEncontrada) break;
+        }
 
-          return { horario, fechaInicio };
+        if (claseActivaEncontrada) {
+          setClaseActiva(claseActivaEncontrada);
+          setProximaClase(null); // No mostramos próxima clase si hay una activa
+          return;
+        }
+
+        // 2. Si no hay clase activa, buscar la próxima clase
+        setClaseActiva(null);
+        const horariosFuturos: { clase: Clase; horario: Horario; fechaInicio: Date }[] = [];
+        clases.forEach((clase) => {
+          clase.horarios.forEach((horario) => {
+            const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+            const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
+            const fechaInicio = new Date(ahora);
+            fechaInicio.setHours(hora, minutos, 0, 0);
+
+            // Ajustar el día al próximo día de la semana correspondiente
+            const diasDiferencia = (diaHorario - diaActual + 7) % 7;
+            if (diasDiferencia === 0 && fechaInicio < ahora) {
+              // Si es hoy pero ya pasó, añadir una semana
+              fechaInicio.setDate(fechaInicio.getDate() + 7);
+            } else {
+              fechaInicio.setDate(fechaInicio.getDate() + diasDiferencia);
+            }
+
+            horariosFuturos.push({ clase, horario, fechaInicio });
+          });
         });
 
         // Encontrar la próxima clase
-        horariosFuturos.sort((a, b) => a.fechaInicio - b.fechaInicio);
+        horariosFuturos.sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime());
         const proxima = horariosFuturos[0];
 
-        if (!proxima) return;
+        if (!proxima) {
+          setProximaClase(null);
+          return;
+        }
 
         // Calcular tiempo restante
-        const diferenciaMs = proxima.fechaInicio - ahora;
+        const diferenciaMs = proxima.fechaInicio.getTime() - ahora.getTime();
         const dias = Math.floor(diferenciaMs / (1000 * 60 * 60 * 24));
         const horas = Math.floor((diferenciaMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutos = Math.floor((diferenciaMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -94,16 +140,16 @@ function PaginaPrincipal() {
         if (horas > 0 || dias > 0) tiempoRestante += `${horas}h `;
         tiempoRestante += `${minutos}m ${segundos}s`;
 
-        setProximaClase({ horario: proxima.horario, tiempoRestante });
+        setProximaClase({ clase: proxima.clase, horario: proxima.horario, tiempoRestante });
       };
 
       // Calcular inicialmente y luego cada segundo
-      calcularProximaClase();
-      const interval = setInterval(calcularProximaClase, 1000);
+      calcularClaseActivaOProxima();
+      const interval = setInterval(calcularClaseActivaOProxima, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [clase]);
+  }, [clases]);
 
   useEffect(() => {
     if (location.pathname === '/inicio') {
@@ -123,81 +169,88 @@ function PaginaPrincipal() {
       ) : (
         <>
           {/* Encabezado */}
-          <div className="row mb-5 align-items-center">
+          <div className="row mb-4 align-items-center">
             <div className="col-12 text-center">
               <h1 className="display-4 fw-bold text-primary mb-2">
                 ¡Hola, {nombre}!
               </h1>
               <p className="lead text-muted">
-                Aquí tienes la información de tu clase asignada
+                Aquí tienes la información de tus clases asignadas
               </p>
             </div>
           </div>
 
-          {/* Clase Asignada */}
-          {clase ? (
-            <div className="row justify-content-center">
+          {/* Contador de Clase Activa o Próxima Clase */}
+          {claseActiva ? (
+            <div className="row mb-5 justify-content-center">
               <div className="col-md-8 col-lg-6">
                 <div
-                  className="card shadow-lg border-0"
+                  className="card shadow-lg border-0 bg-success text-white"
                   style={{
                     borderRadius: '15px',
-                    backgroundColor: '#f8f9fa',
                   }}
                 >
-                  <div
-                    className="card-header text-white text-center"
-                    style={{
-                      backgroundColor: '#007bff',
-                      borderTopLeftRadius: '15px',
-                      borderTopRightRadius: '15px',
-                    }}
-                  >
-                    <h3 className="card-title mb-0">{clase.nombre}</h3>
-                  </div>
-                  <div className="card-body">
-                    {/* Temporizador */}
-                    {proximaClase ? (
-                      <div className="text-center mb-4">
-                        <h5 className="text-muted">
-                          <i className="bi bi-clock me-2"></i>Próxima Clase
-                        </h5>
-                        <p className="fs-4 fw-bold text-primary">
-                          {proximaClase.tiempoRestante}
-                        </p>
-                        <p className="text-muted">
-                          {proximaClase.horario.dia.charAt(0).toUpperCase() + proximaClase.horario.dia.slice(1)} a las {proximaClase.horario.hora_inicio}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-center text-muted mb-4">No hay clases próximas programadas</p>
-                    )}
-
-                    {/* Horarios */}
-                    <h5 className="text-muted mb-3">
-                      <i className="bi bi-calendar3 me-2"></i>Horarios
+                  <div className="card-body text-center">
+                    <h5 className="card-title mb-3">
+                      <i className="bi bi-play-circle me-2"></i>Clase en Curso
                     </h5>
-                    {clase.horarios.length > 0 ? (
-                      <ul className="list-group list-group-flush">
-                        {clase.horarios.map((h, idx) => (
-                          <li key={idx} className="list-group-item border-0 px-0 py-2">
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <strong>{h.dia.charAt(0).toUpperCase() + h.dia.slice(1)}:</strong>{' '}
-                                {h.hora_inicio} - {h.hora_fin}
-                                <br />
-                                <small className="text-muted">Aula: {h.nombre_aula}</small>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted">Sin horarios definidos</p>
-                    )}
+                    <h3 className="mb-2">
+                      {claseActiva.clase.nombre_asignatura}
+                    </h3>
+                    <p className="mb-0">
+                      {claseActiva.horario.dia.charAt(0).toUpperCase() + claseActiva.horario.dia.slice(1)} de {claseActiva.horario.hora_inicio} a {claseActiva.horario.hora_fin}
+                    </p>
                   </div>
                 </div>
               </div>
+            </div>
+          ) : proximaClase ? (
+            <div className="row mb-5 justify-content-center">
+              <div className="col-md-8 col-lg-6">
+                <div
+                  className="card shadow-lg border-0 bg-primary text-white"
+                  style={{
+                    borderRadius: '15px',
+                  }}
+                >
+                  <div className="card-body text-center">
+                    <h5 className="card-title mb-3">
+                      <i className="bi bi-clock me-2"></i>Próxima Clase
+                    </h5>
+                    <h3 className="mb-2">
+                      {proximaClase.clase.nombre_asignatura}
+                    </h3>
+                    <p className="fs-4 fw-bold mb-2">
+                      {proximaClase.tiempoRestante}
+                    </p>
+                    <p className="mb-0">
+                      {proximaClase.horario.dia.charAt(0).toUpperCase() + proximaClase.horario.dia.slice(1)} a las {proximaClase.horario.hora_inicio}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="row mb-5 justify-content-center">
+              <div className="col-md-8 col-lg-6">
+                <div className="alert alert-info text-center" role="alert">
+                  No hay clases próximas programadas.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de Clases Asignadas */}
+          {clases.length > 0 ? (
+            <div className="row g-4">
+              {clases.map((clase) => (
+                <div key={clase.id_clase} className="col-md-6 col-lg-4">
+                  <ClaseCard
+                    nombreAsignatura={clase.nombre_asignatura}
+                    horarios={clase.horarios}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
             <div className="alert alert-info text-center" role="alert">

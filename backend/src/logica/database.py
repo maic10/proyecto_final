@@ -6,12 +6,18 @@ from src.servidor.api import mongo  # Importamos mongo desde servidor/api/__init
 db = mongo.db
 
 # Referencias a las colecciones
+asignaturas_collection = db["asignaturas"]
 raspberry_collection = db["configuracion_raspberry"]
 aulas_collection = db["aulas"]
 usuarios_collection = db["usuarios"]
 estudiantes_collection = db["estudiantes"]
 clases_collection = db["clases"]
 asistencias_collection = db["asistencias"]
+
+
+def get_asignatura_by_id(id_asignatura):
+    """Obtiene una asignatura por su id_asignatura."""
+    return asignaturas_collection.find_one({"id_asignatura": id_asignatura})
 
 def update_raspberry_last_connection(id_raspberry_pi: str) -> None:
     """

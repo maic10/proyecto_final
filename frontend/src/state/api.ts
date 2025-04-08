@@ -161,3 +161,15 @@ export async function obtenerAsistenciasEstudiante(
     throw error;
   }
 }
+
+export const obtenerEstudiantes = async (classId?: string) => {
+  const token = obtenerToken();
+  const params = classId ? { class_id: classId } : {};
+  const response = await axios.get(`${API_BASE}/estudiantes`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params,
+  });
+  return response.data;
+};

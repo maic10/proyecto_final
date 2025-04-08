@@ -1,3 +1,4 @@
+# src/logica/deteccion.py
 import cv2
 import numpy as np
 import torch
@@ -79,10 +80,11 @@ class FaceTracker:
         else:
             fps = self.frame_count / elapsed_time if elapsed_time > 0 else 0.0  # Mostrar valor intermedio
         
-        # Dibujar FPS en cada frame
+        # Dibujar FPS en el frame
         cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-            
+        return frame
+
     def identify_faces(self, faces, tracked_objects):
         """Identifica rostros solo para tracks nuevos o desconocidos, respetando identidades conocidas."""
         # Mapa de tracks: idx -> track_id
@@ -144,16 +146,16 @@ class FaceTracker:
         self.frame_count += 1
         self.detect_counter += 1
 
+        # Asegurarse de que el frame sea escribible
+        frame = frame.copy()  # Crear una copia para evitar problemas de solo lectura
+
         if frame.shape[:2] != (480, 640):
             frame_resized = cv2.resize(frame, (640, 480))
         else:
             frame_resized = frame
 
-        #faces = self.detector.get(frame_resized)
-
         if self.detect_counter % self.detect_interval == 0:
             faces = self.detector.get(frame_resized)
-            #logger.info(f"Detectados {len(faces)} rostros en frame {self.frame_count}")
         else:
             faces = self.last_faces
 
@@ -212,7 +214,7 @@ class FaceTracker:
             cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         # Actualizar y dibujar FPS
-        self.update_fps(frame_resized)
+        frame_resized = self.update_fps(frame_resized)
 
         return frame_resized
 
@@ -223,7 +225,7 @@ if __name__ == "__main__":
     embeddings_gen = EmbeddingsGenerator(IMAGES_DIR)
     embeddings_dict = embeddings_gen.load_and_generate_embeddings()
 
-    tracker = FaceTracker(embeddings_dict=embeddings_dict,verbose=False)
+    tracker = FaceTracker(embeddings_dict=embeddings_dict, verbose=False)
 
     print("Selecciona la fuente de video:")
     print("  - Ingresa '0' para usar la cámara.")

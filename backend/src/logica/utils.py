@@ -204,3 +204,20 @@ def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> No
 
     # Crear el documento de asistencia
     create_asistencia(id_clase, fecha, id_aula, registros)
+
+def get_clases_by_usuario(id_usuario):
+    """
+    Obtiene todas las clases asociadas a un usuario (profesor) por su id_usuario.
+    
+    Args:
+        id_usuario (str): ID del usuario (profesor).
+    
+    Returns:
+        list: Lista de documentos de clases asociadas al usuario.
+    """
+    try:
+        clases = list(clases_collection.find({"id_usuario": id_usuario}))
+        return clases
+    except Exception as e:
+        logger.error(f"Error al obtener clases para el usuario {id_usuario}: {str(e)}")
+        raise

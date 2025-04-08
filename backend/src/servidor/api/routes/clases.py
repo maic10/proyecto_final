@@ -1,9 +1,10 @@
 # src/servidor/api/routes/clases.py
-from flask_restx import Resource, Namespace
+from flask_restx import Resource, Namespace, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
 from src.modelos.clase import clase_model
-from src.logica.database import get_user_by_id, get_clases_to_profesor_by_id, aulas_collection
+from src.logica.database import get_user_by_id, get_asignatura_by_id, aulas_collection
+from src.logica.utils import get_clases_by_usuario
 
 @ns.route("/clases")
 class ClasesResource(Resource):
@@ -19,15 +20,16 @@ class ClasesResource(Resource):
             return {"mensaje": "Acceso denegado"}, 403
 
         # Obtener el id_usuario del parámetro (debe coincidir con el usuario autenticado)
-        id_usuario = ns.parser().add_argument(
-            "id_usuario", type=str, required=True, help="ID del profesor"
-        ).parse_args()["id_usuario"]
+        parser = reqparse.RequestParser()
+        parser.add_argument("id_usuario", type=str, required=True, help="ID del profesor")
+        args = parser.parse_args()
+        id_usuario = args["id_usuario"]
 
         if id_usuario != identity:
             return {"mensaje": "No puedes consultar clases de otro profesor"}, 403
 
         # Buscar las clases del profesor
-        clases = list(get_clases_to_profesor_by_id(id_usuario))
+        clases = list(get_clases_by_usuario(id_usuario))
 
         # Obtener todos los nombres de aulas en un solo query
         aula_ids = set()
@@ -42,14 +44,19 @@ class ClasesResource(Resource):
             for horario in clase.get("horarios", []):
                 horario["nombre_aula"] = aulas.get(horario["id_aula"], horario["id_aula"])
 
-        # Formatear respuesta sin id_usuario
-        response = [
-            {
+        # Formatear respuesta con nombre_grupo, id_asignatura y nombre_asignatura separados
+        response = []
+        for c in clases:
+            asignatura_doc = get_asignatura_by_id(c["id_asignatura"])
+            nombre_asignatura = asignatura_doc["nombre"] if asignatura_doc else "Asignatura desconocida"
+            nombre_grupo = c.get("nombre_grupo", "Grupo desconocido")
+
+            response.append({
                 "id_clase": c["id_clase"],
-                "nombre": c["nombre"],
+                "nombre_grupo": nombre_grupo,
+                "id_asignatura": c["id_asignatura"],
+                "nombre_asignatura": nombre_asignatura,
                 "horarios": c.get("horarios", [])
-            }
-            for c in clases
-        ]
+            })
 
         return response, 200
