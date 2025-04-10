@@ -1,19 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { obtenerUsuario } from '../state/auth';
+import { obtenerUsuario } from '../../state/auth';
 import { 
   obtenerAsistenciasResumen,
   exportarAsistenciasExcel
-} from '../state/api';
+} from '../../state/api';
 
-interface AsistenciaResumen {
-  _id: string;
-  fecha: string;
-  id_aula: string;
-  nombre_aula: string;
-  id_clase: string;
-  nombre_clase: string;
-}
+import { AsistenciaResumen } from '../../types/asistencias';
+
 
 function PaginaAsistencias() {
   // Lista de asistencias resumidas

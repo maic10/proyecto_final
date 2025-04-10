@@ -1,44 +1,14 @@
-// src/pages/PaginaEstudiantes.tsx
+// src/pages/profesor/PaginaEstudiantes.tsx
 import { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { obtenerClases, obtenerEstudiantes, obtenerAsistenciasEstudiante } from '../state/api';
-import { obtenerUsuario } from '../state/auth';
-import ClasesList from '../components/ClasesList';
-import EstudiantesList from '../components/EstudiantesList';
+import { obtenerClases, obtenerEstudiantes, obtenerAsistenciasEstudiante } from '../../state/api';
+import { obtenerUsuario } from '../../state/auth';
+import ClasesList from '../../components/clases/ClasesList';
+import EstudiantesList from '../../components/estudiantes/EstudiantesList';
 import * as bootstrap from 'bootstrap';
-
-interface Horario {
-  dia: string;
-  hora_inicio: string;
-  hora_fin: string;
-  id_aula: string;
-  nombre_aula: string;
-}
-
-interface Estudiante {
-  id_estudiante: string;
-  nombre: string;
-  apellido: string;
-  urls_fotos: string[];
-  ids_clases: string[];
-}
-
-interface Clase {
-  id_clase: string;
-  id_asignatura: string;
-  nombre_asignatura: string;
-  horarios: Horario[];
-}
-
-interface Asistencia {
-  fecha: string;
-  estado: string;
-}
-
-interface ResumenAsistencias {
-  asistidas: number;
-  ausentes: number;
-}
+import { Clase } from '../../types/clases';
+import { Estudiante } from '../../types/estudiantes';
+import { Asistencia, ResumenAsistencias } from '../../types/asistencias';
 
 function PaginaEstudiantes() {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
@@ -57,7 +27,7 @@ function PaginaEstudiantes() {
   const location = useLocation();
   const navigate = useNavigate();
   const modalRef = useRef<bootstrap.Modal | null>(null);
-  const focusAnchorRef = useRef<HTMLButtonElement>(null); // Referencia para el elemento enfocable
+  const focusAnchorRef = useRef<HTMLButtonElement>(null);
 
   // Inicializar el modal
   useEffect(() => {
@@ -89,7 +59,8 @@ function PaginaEstudiantes() {
   const cargarEstudiantes = async (classId: string) => {
     setCargandoEstudiantes(true);
     try {
-      const estudiantesData = await obtenerEstudiantes(classId);
+      // Cargar estudiantes con fotos (incluir_foto=true)
+      const estudiantesData = await obtenerEstudiantes(classId, true);
       setEstudiantes(estudiantesData);
       setEstudiantesFiltrados(estudiantesData);
     } catch (error) {

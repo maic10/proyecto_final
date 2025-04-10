@@ -7,7 +7,7 @@ from src.modelos.estudiante import estudiante_model
 from src.modelos.usuario import usuario_model
 from src.modelos.aula import aula_model
 from src.modelos.clase import clase_model
-from src.logica.url_embeddings_generator import UrlEmbeddingsGenerator
+##from src.logica.url_embeddings_generator import UrlEmbeddingsGenerator
 from src.logica.logger import logger
 
 import_request_model = ns.model("ImportRequest", {
@@ -29,16 +29,13 @@ class ImportarResource(Resource):
             return {"error": "Acceso denegado: se requiere rol de administrador"}, 403
 
         data = ns.payload
-        embedding_generator = UrlEmbeddingsGenerator()
+        #embedding_generator = UrlEmbeddingsGenerator()
 
         # Procesar estudiantes
         if data.get("estudiantes"):
             for estudiante in data["estudiantes"]:
-                if "urls_fotos" in estudiante and estudiante["urls_fotos"]:
-                    embeddings = embedding_generator.process_student_urls(estudiante["urls_fotos"])
-                    estudiante["embeddings"] = embeddings if embeddings else []
-                else:
-                    estudiante["embeddings"] = []
+
+                estudiante["embeddings"] = []
 
                 # Actualizar o insertar estudiante
                 result = estudiantes_collection.update_one(

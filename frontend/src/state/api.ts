@@ -1,8 +1,6 @@
 import axios from 'axios';
-import { obtenerToken } from './auth';
-
-const API_BASE = 'http://127.0.0.1:5000/api';
-
+import { obtenerToken, obtenerUsuario } from './auth';
+import { API_BASE } from '../utils/constants';
 
 export async function iniciarSesion(correo: string, contraseña: string) {
   const res = await axios.post(`${API_BASE}/autenticacion/iniciar_sesion`, {
@@ -162,10 +160,136 @@ export async function obtenerAsistenciasEstudiante(
   }
 }
 
-export const obtenerEstudiantes = async (classId?: string) => {
+export const obtenerEstudiantes = async (classId?: string, includePhotos: boolean = false) => {
   const token = obtenerToken();
-  const params = classId ? { class_id: classId } : {};
+  const usuario = obtenerUsuario();
+
+  if (!usuario) {
+    throw new Error('Usuario no autenticado');
+  }
+
+  const params: { [key: string]: string | boolean } = {
+    incluir_foto: includePhotos,
+  };
+
+  if (usuario.rol === 'profesor' && classId) {
+    params.class_id = classId;
+  }
+
   const response = await axios.get(`${API_BASE}/estudiantes`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    params,
+  });
+  return response.data;
+};
+
+export const subirImagenEstudiante = async (idEstudiante: string, imagen: File) => {
+  const token = obtenerToken();
+  const formData = new FormData();
+  formData.append('imagen', imagen);
+
+  const response = await axios.post(
+    `${API_BASE}/estudiantes/${idEstudiante}/subir-imagen`,
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+};
+
+export const crearEstudiante = async (nombre: string, apellido: string, idsClases: string[]) => {
+  const token = obtenerToken();
+  const response = await axios.post(
+    `${API_BASE}/estudiantes/nuevo`,
+    { nombre, apellido, ids_clases: idsClases },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
+
+export const actualizarEstudiante = async (idEstudiante: string, nombre: string, apellido: string, idsClases: string[]) => {
+  const token = obtenerToken();
+  const response = await axios.put(
+    `${API_BASE}/estudiantes/${idEstudiante}`,
+    { nombre, apellido, ids_clases: idsClases },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
+
+export const obtenerEstudiantePorId = async (idEstudiante: string) => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/estudiantes/${idEstudiante}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+export const eliminarEstudiante = async (idEstudiante: string) => {
+  const token = obtenerToken();
+  const response = await axios.delete(`${API_BASE}/estudiantes/${idEstudiante}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+export const eliminarImagenEstudiante = async (idEstudiante: string, fileId: string) => {
+  const token = obtenerToken();
+  const response = await axios.delete(`${API_BASE}/estudiantes/${idEstudiante}/imagenes/${fileId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+export const obtenerAsignaturas = async () => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/asignaturas`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+export const obtenerProfesoresPorAsignatura = async (idAsignatura: string) => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/asignaturas/${idAsignatura}/profesores`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+export const obtenerClasesAdmin = async (idAsignatura?: string, idUsuario?: string, idClase?: string) => {
+  const token = obtenerToken();
+  const params: { [key: string]: string | undefined } = {
+    id_asignatura: idAsignatura,
+    id_usuario: idUsuario,
+    id_clase: idClase,
+  };
+
+  const response = await axios.get(`${API_BASE}/clases-admin`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

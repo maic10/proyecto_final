@@ -40,6 +40,7 @@ from src.servidor.api.routes.raspberry import *
 from src.servidor.api.routes.estudiantes import *
 from src.servidor.api.routes.video import *
 from src.servidor.api.routes.transmision import *
+from src.servidor.api.routes.asignaturas import *
 
 # Inicia el hilo de recepción de video al cargar la app
 #import src.servidor.video

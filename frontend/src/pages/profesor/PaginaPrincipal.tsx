@@ -1,24 +1,10 @@
 // src/pages/PaginaPrincipal.tsx
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { obtenerPerfil, obtenerClases } from '../state/api';
-import { obtenerUsuario } from '../state/auth';
-import ClaseCard from '../components/ClaseCard';
-
-interface Horario {
-  dia: string;
-  hora_inicio: string;
-  hora_fin: string;
-  id_aula: string;
-  nombre_aula: string;
-}
-
-interface Clase {
-  id_clase: string;
-  id_asignatura: string;
-  nombre_asignatura: string;
-  horarios: Horario[];
-}
+import { obtenerPerfil, obtenerClases } from '../../state/api';
+import { obtenerUsuario } from '../../state/auth';
+import ClaseCard from '../../components/clases/ClaseCard';
+import { Clase, Horario } from '../../types/clases';
 
 function PaginaPrincipal() {
   const [nombre, setNombre] = useState('');

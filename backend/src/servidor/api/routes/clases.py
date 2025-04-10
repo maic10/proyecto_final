@@ -3,7 +3,7 @@ from flask_restx import Resource, Namespace, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
 from src.modelos.clase import clase_model
-from src.logica.database import get_user_by_id, get_asignatura_by_id, aulas_collection
+from src.logica.database import get_user_by_id, get_asignatura_by_id, aulas_collection, clases_collection
 from src.logica.utils import get_clases_by_usuario
 
 @ns.route("/clases")
@@ -60,3 +60,49 @@ class ClasesResource(Resource):
             })
 
         return response, 200
+    
+@ns.route("/clases-admin")
+class ClasesAdminResource(Resource):
+    @jwt_required()
+    @ns.doc(description="Obtener clases basadas en asignatura, profesor o ID de clase (para administradores)")
+    @ns.doc(params={
+        "id_asignatura": "ID de la asignatura (requerido si no se proporciona id_clase)",
+        "id_usuario": "ID del usuario/profesor (opcional)",
+        "id_clase": "ID de la clase (opcional, si se proporciona, se ignoran id_asignatura e id_usuario)"
+    })
+    def get(self):
+        """Obtener clases basadas en asignatura, profesor o ID de clase"""
+        identity = get_jwt_identity()
+        user = get_user_by_id(identity)
+
+        if not user or user["rol"] != "admin":
+            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+            return {"error": "Acceso denegado"}, 403
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("id_asignatura", type=str, location="args", required=False)
+        parser.add_argument("id_usuario", type=str, location="args", required=False)
+        parser.add_argument("id_clase", type=str, location="args", required=False)
+        args = parser.parse_args()
+
+        id_asignatura = args["id_asignatura"]
+        id_usuario = args["id_usuario"]
+        id_clase = args["id_clase"]
+
+        # Validar que se proporcione al menos id_clase o id_asignatura
+        if not id_clase and not id_asignatura:
+            return {"error": "Se requiere id_clase o id_asignatura"}, 400
+
+        # Construir la consulta
+        query = {}
+        if id_clase:
+            query["id_clase"] = id_clase
+        else:
+            query["id_asignatura"] = id_asignatura
+            if id_usuario:
+                query["id_usuario"] = id_usuario
+
+        clases = list(clases_collection.find(query))
+        for clase in clases:
+            clase["_id"] = str(clase["_id"])
+        return clases, 200

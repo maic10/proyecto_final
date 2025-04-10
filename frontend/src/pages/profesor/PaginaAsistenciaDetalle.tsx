@@ -1,24 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { obtenerUsuario } from '../state/auth';
-import { obtenerAsistenciaDetalle } from '../state/api';
-
-interface RegistroDetallado {
-  Estudiante: string;
-  Estado: string;
-  "Fecha detección": string | null;
-  "Modificado por": string | null;
-  "Fecha modificación": string | null;
-}
-
-interface AsistenciaDetalle {
-  id_clase: string;
-  fecha: string;
-  id_aula: string;
-  nombre_clase: string;
-  nombre_aula: string;
-  registros: RegistroDetallado[];
-}
+import { obtenerUsuario } from '../../state/auth';
+import { obtenerAsistenciaDetalle } from '../../state/api';
+import { AsistenciaDetalle } from '../../types/asistencias';
 
 function PaginaAsistenciaDetalle() {
   const [detalle, setDetalle] = useState<AsistenciaDetalle | null>(null);

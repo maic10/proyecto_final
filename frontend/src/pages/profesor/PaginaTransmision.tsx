@@ -1,40 +1,14 @@
 // src/pages/PaginaTransmision.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { obtenerUsuario } from '../state/auth';
-import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantesPorClase } from '../state/api';
+import { obtenerUsuario } from '../../state/auth';
+import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantes } from '../../state/api';
 import { formatInTimeZone } from 'date-fns-tz';
+import { Clase, Horario } from '../../types/clases';
+import { Estudiante } from '../../types/estudiantes';
+import { RegistroAsistencia } from '../../types/asistencias';
+import { API_BASE } from '../../utils/constants';
 
-interface Horario {
-  dia: string;
-  hora_inicio: string;
-  hora_fin: string;
-  id_aula: string;
-  nombre_aula: string;
-}
-
-interface RegistroAsistencia {
-  id_estudiante: string;
-  estado: string;
-  confianza: number | null;
-  fecha_deteccion: string | null;
-  modificado_por_usuario?: string | null;
-  modificado_fecha?: string | null;
-}
-
-interface Estudiante {
-  id_estudiante: string;
-  nombre: string;
-  apellido: string;
-}
-
-interface Clase {
-  id_clase: string;
-  nombre_asignatura: string;
-  horarios: Horario[];
-}
-
-const API_BASE = 'http://127.0.0.1:5000/api';
 
 const PaginaTransmision: React.FC = () => {
   const [idClase, setIdClase] = useState<string | null>(null);
@@ -150,7 +124,7 @@ const PaginaTransmision: React.FC = () => {
           setNombreClase(claseSeleccionada.nombre_asignatura);
 
           // Cargar estudiantes de la clase seleccionada
-          const estudiantesData = await obtenerEstudiantesPorClase(claseSeleccionada.id_clase);
+          const estudiantesData = await obtenerEstudiantes(claseSeleccionada.id_clase);
           setEstudiantes(estudiantesData);
         } else {
           setError('No hay clases próximas programadas.');

@@ -1,6 +1,7 @@
 # src/logica/database.py
 from datetime import datetime
 from src.servidor.api import mongo  # Importamos mongo desde servidor/api/__init__.py
+from gridfs import GridFS
 
 # Usamos mongo.db en lugar de crear una nueva conexión
 db = mongo.db
@@ -13,6 +14,9 @@ usuarios_collection = db["usuarios"]
 estudiantes_collection = db["estudiantes"]
 clases_collection = db["clases"]
 asistencias_collection = db["asistencias"]
+
+# Configuración de GridFS para almacenar imágenes
+fs = GridFS(db, collection="imagenes_estudiantes")
 
 
 def get_asignatura_by_id(id_asignatura):

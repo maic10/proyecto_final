@@ -1,14 +1,7 @@
 // src/components/EstudiantesList.tsx
 import React from 'react';
 import EstudianteCard from './EstudianteCard';
-
-interface Estudiante {
-  id_estudiante: string;
-  nombre: string;
-  apellido: string;
-  urls_fotos: string[];
-  ids_clases: string[];
-}
+import { Estudiante } from '../../types';
 
 interface EstudiantesListProps {
   estudiantes: Estudiante[];
@@ -17,7 +10,7 @@ interface EstudiantesListProps {
   orden: 'asc' | 'desc';
   onBusquedaChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onOrdenChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onEstudianteClick: (estudiante: Estudiante) => void;
+  onEstudianteClick: (estudiante: Estudiante, buttonRef: HTMLButtonElement) => void;
   onVolver: () => void;
   cargando: boolean;
 }
@@ -92,12 +85,14 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
         <div className="row g-4">
           {estudiantesFiltrados.map((est) => (
             <div key={est.id_estudiante} className="col-6 col-md-4 col-lg-3">
-              <div onClick={() => onEstudianteClick(est)}>
+              <div>
                 <EstudianteCard
                   nombre={est.nombre}
                   apellido={est.apellido}
-                  fotoUrl={est.urls_fotos?.[0]}
+                  fotoBase64={est.imagenes?.[0]?.data}
+                  fotoMimetype={est.imagenes?.[0]?.mimetype}
                   idEstudiante={est.id_estudiante}
+                  onClick={(buttonRef) => onEstudianteClick(est, buttonRef)}
                 />
               </div>
             </div>

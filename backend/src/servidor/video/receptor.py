@@ -12,8 +12,8 @@ from src.logica.utils import (
     registrar_asistencia_en_db
 )
 
-MODO_LOCAL = False
-MODO_LOCAL_CAMARA = True # Cambiar a False para usar un video pregrabado
+MODO_LOCAL = True
+MODO_LOCAL_CAMARA = False # Cambiar a False para usar un video pregrabado
 VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
 
 transmisiones = {}
