@@ -1,9 +1,8 @@
 from flask_restx import Resource, reqparse, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.servidor.api import ns, mongo
+from src.servidor.api import ns
 from src.modelos.asistencia import asistencia_model
 from src.logica.database import get_asistencia, update_asistencia, get_clase_by_id, get_aula_by_id, create_asistencia,asistencias_collection,estudiantes_collection
-from datetime import datetime
 from datetime import datetime
 import pandas as pd
 import io

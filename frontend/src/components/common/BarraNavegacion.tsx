@@ -30,6 +30,9 @@ function BarraNavegacion() {
                 <li className="nav-item">
                   <NavLink to="/admin/estudiantes" className="nav-link">Estudiantes</NavLink>
                 </li>
+                <li className="nav-item">
+                  <NavLink to="/admin/horarios" className="nav-link">Horarios</NavLink>
+                </li>
               </>
             ) : (
               <>

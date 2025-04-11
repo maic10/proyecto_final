@@ -41,6 +41,9 @@ from src.servidor.api.routes.estudiantes import *
 from src.servidor.api.routes.video import *
 from src.servidor.api.routes.transmision import *
 from src.servidor.api.routes.asignaturas import *
+from src.servidor.api.routes.horarios import *
+from src.servidor.api.routes.profesor import *
+from src.servidor.api.routes.aulas import *
 
 # Inicia el hilo de recepción de video al cargar la app
 #import src.servidor.video

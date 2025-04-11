@@ -5,11 +5,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
 from src.logica.database import get_user_by_id, asignaturas_collection, clases_collection, usuarios_collection
 from src.logica.logger import logger
+from src.modelos.asignatura import asignatura_model 
+from src.modelos.usuario import usuario_model
 
 @ns.route("/asignaturas")
 class AsignaturasResource(Resource):
     @jwt_required()
     @ns.doc(description="Operaciones relacionadas con asignaturas")
+    @ns.marshal_list_with(asignatura_model)  # Usar el modelo para la respuesta
     def get(self):
         """Lista todas las asignaturas"""
         identity = get_jwt_identity()
@@ -28,6 +31,7 @@ class AsignaturasResource(Resource):
 class ProfesoresPorAsignaturaResource(Resource):
     @jwt_required()
     @ns.doc(description="Obtener los profesores que imparten una asignatura")
+    @ns.marshal_list_with(usuario_model)  # Usar el modelo de usuario
     def get(self, id_asignatura):
         """Lista los profesores que imparten una asignatura específica"""
         identity = get_jwt_identity()

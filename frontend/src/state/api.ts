@@ -1,6 +1,8 @@
+// src/state/api.ts
 import axios from 'axios';
 import { obtenerToken, obtenerUsuario } from './auth';
 import { API_BASE } from '../utils/constants';
+import { Horario, Clase, Profesor, Asignatura,Aula } from '../types/horarios';
 
 export async function iniciarSesion(correo: string, contraseña: string) {
   const res = await axios.post(`${API_BASE}/autenticacion/iniciar_sesion`, {
@@ -294,6 +296,55 @@ export const obtenerClasesAdmin = async (idAsignatura?: string, idUsuario?: stri
       Authorization: `Bearer ${token}`,
     },
     params,
+  });
+  return response.data;
+};
+
+export const obtenerProfesores = async (): Promise<Profesor[]> => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/profesor/profesores`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clase[]> => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/clases`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { profesor: profesorId }
+  });
+  return response.data;
+};
+
+export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/clases`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { asignatura: asignaturaId }
+  });
+  return response.data;
+};
+
+export const obtenerClasePorId = async (idClase: string): Promise<Clase> => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/clases/${idClase}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const actualizarHorarios = async (idClase: string, horarios: Horario[]): Promise<void> => {
+  const token = obtenerToken();
+  await axios.put(`${API_BASE}/clases/${idClase}/horarios`, { horarios }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const obtenerAulas = async (): Promise<Aula[]> => {
+  const token = obtenerToken();
+  const response = await axios.get(`${API_BASE}/aulas`, {
+    headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };

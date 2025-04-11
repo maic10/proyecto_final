@@ -13,6 +13,7 @@ import PaginaPrincipalAdmin from './pages/admin/PaginaPrincipalAdmin';
 import PaginaGestionarEstudiantes from './pages/admin/PaginaGestionarEstudiantes';
 import PaginaCrearEstudiante from './pages/admin/PaginaCrearEstudiante';
 import PaginaEditarEstudiante from './pages/admin/PaginaEditarEstudiante';
+import GestionarHorarios from './pages/admin/GestionarHorarios';
 import { estaAutenticado } from './state/auth';
 
 function AppWrapper() {
@@ -95,6 +96,14 @@ function AppWrapper() {
           element={
             <RutaPrivada roles={['admin']}>
               <PaginaEditarEstudiante />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/horarios"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <GestionarHorarios />
             </RutaPrivada>
           }
         />
