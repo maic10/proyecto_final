@@ -42,7 +42,6 @@ const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
           )}
           <div>
             <h6 className="mb-0">{estudiante.nombre} {estudiante.apellido}</h6>
-            <small className="text-muted">ID: {estudiante.id_estudiante}</small>
           </div>
         </div>
       ))}
