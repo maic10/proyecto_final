@@ -1,5 +1,5 @@
 // src/components/admin/FormularioEditarEstudiante.tsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Estudiante, ClaseAsignada, Imagen } from '../../types/estudiantes';
 import { obtenerAsignaturas, obtenerProfesoresPorAsignatura, subirImagenEstudiante, eliminarImagenEstudiante } from '../../state/api';
 
@@ -61,6 +61,7 @@ const FormularioEditarEstudiante: React.FC<FormularioEditarEstudianteProps> = ({
   const [forceRender, setForceRender] = useState(0);
   const [isProfesorDisabled, setIsProfesorDisabled] = useState(false);
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // Estado para el modal de confirmación
 
   // Hacer que los mensajes de error desaparezcan después de 5 segundos
   useEffect(() => {
@@ -333,16 +334,26 @@ const FormularioEditarEstudiante: React.FC<FormularioEditarEstudianteProps> = ({
     }
   };
 
-  // Manejar la eliminación del estudiante
-  const handleDelete = async () => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este estudiante?')) {
-      try {
-        await onDelete(estudiante.id_estudiante);
-      } catch (err: any) {
-        console.error('Error al eliminar estudiante:', err);
-        setError('Error al eliminar el estudiante. Intenta de nuevo más tarde.');
-      }
+  // Mostrar el modal de confirmación para eliminar
+  const handleShowConfirmModal = () => {
+    setShowConfirmModal(true);
+  };
+
+  // Confirmar la eliminación del estudiante
+  const confirmDelete = async () => {
+    try {
+      await onDelete(estudiante.id_estudiante);
+      setShowConfirmModal(false);
+    } catch (err: any) {
+      console.error('Error al eliminar estudiante:', err);
+      setError('Error al eliminar el estudiante. Intenta de nuevo más tarde.');
+      setShowConfirmModal(false);
     }
+  };
+
+  // Cancelar la eliminación
+  const cancelDelete = () => {
+    setShowConfirmModal(false);
   };
 
   return (
@@ -545,7 +556,7 @@ const FormularioEditarEstudiante: React.FC<FormularioEditarEstudianteProps> = ({
       <div className="mt-4">
         <button
           className="btn btn-danger me-2"
-          onClick={handleDelete}
+          onClick={handleShowConfirmModal}
         >
           Eliminar Estudiante
         </button>
@@ -555,6 +566,29 @@ const FormularioEditarEstudiante: React.FC<FormularioEditarEstudianteProps> = ({
         >
           Cancelar
         </button>
+      </div>
+
+      {/* Modal de confirmación para eliminar */}
+      <div className={`modal fade ${showConfirmModal ? 'show d-block' : ''}`} tabIndex={-1} role="dialog" style={{ backgroundColor: showConfirmModal ? 'rgba(0,0,0,0.5)' : 'transparent' }}>
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Confirmar Eliminación</h5>
+              <button type="button" className="btn-close" onClick={cancelDelete} aria-label="Cerrar"></button>
+            </div>
+            <div className="modal-body">
+              <p>¿Estás seguro de que deseas eliminar este estudiante?</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={cancelDelete}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDelete}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {error && <div className="alert alert-danger mt-3">{error}</div>}

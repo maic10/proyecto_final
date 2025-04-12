@@ -1,6 +1,6 @@
 // src/components/admin/FormularioCrearEstudiante.tsx
 import { useState, useEffect } from 'react';
-import { obtenerAsignaturas, obtenerProfesoresPorAsignatura, obtenerClasesAdmin } from '../../state/api';
+import { obtenerAsignaturas, obtenerProfesoresPorAsignatura, obtenerClasesAdmin, obtenerProfesores } from '../../state/api';
 
 interface Asignatura {
   id_asignatura: string;
@@ -32,7 +32,8 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
   setError,
 }) => {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
-  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [todosProfesores, setTodosProfesores] = useState<Profesor[]>([]); // Lista completa de profesores
+  const [profesoresAsignatura, setProfesoresAsignatura] = useState<Profesor[]>([]); // Profesores de la asignatura seleccionada
   const [nuevoEstudiante, setNuevoEstudiante] = useState({ nombre: '', apellido: '' });
   const [clasesAsignadas, setClasesAsignadas] = useState<ClaseAsignada[]>([]);
   const [nuevaClaseAsignada, setNuevaClaseAsignada] = useState({ idAsignatura: '', idProfesor: '' });
@@ -61,9 +62,9 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
     }
   }, [mensajeConfirmacion]);
 
-  // Cargar asignaturas al montar el componente
+  // Cargar asignaturas y profesores al montar el componente
   useEffect(() => {
-    const cargarAsignaturas = async () => {
+    const cargarDatosIniciales = async () => {
       setCargandoAsignaturas(true);
       setError(null);
       try {
@@ -73,23 +74,30 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
         if (asignaturasData.length === 0) {
           setError('No se encontraron asignaturas disponibles.');
         }
+
+        const profesoresData = await obtenerProfesores();
+        console.log('Todos los profesores cargados:', profesoresData);
+        setTodosProfesores(profesoresData);
+        if (profesoresData.length === 0) {
+          setError('No se encontraron profesores disponibles.');
+        }
       } catch (err: any) {
-        console.error('Error al cargar asignaturas:', err);
-        setError(err.response?.data?.error || 'Error al cargar las asignaturas. Intenta de nuevo más tarde.');
+        console.error('Error al cargar asignaturas o profesores:', err);
+        setError(err.response?.data?.error || 'Error al cargar las asignaturas o profesores. Intenta de nuevo más tarde.');
       } finally {
         setCargandoAsignaturas(false);
       }
     };
 
-    cargarAsignaturas();
+    cargarDatosIniciales();
   }, [setError]);
 
   // Cargar profesores cuando se selecciona una asignatura
   const handleAsignaturaChange = async (idAsignatura: string) => {
     try {
       const profesoresData = await obtenerProfesoresPorAsignatura(idAsignatura);
-      console.log('Profesores cargados:', profesoresData);
-      setProfesores(profesoresData);
+      console.log('Profesores cargados para asignatura', idAsignatura, ':', profesoresData);
+      setProfesoresAsignatura(profesoresData);
 
       // Si solo hay un profesor, pre-seleccionarlo y deshabilitar el selector
       if (profesoresData.length === 1) {
@@ -132,7 +140,7 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
     console.log('Añadiendo clase:', nuevaClaseAsignada);
     setClasesAsignadas([...clasesAsignadas, { idAsignatura: nuevaClaseAsignada.idAsignatura, idProfesor: nuevaClaseAsignada.idProfesor }]);
     setNuevaClaseAsignada({ idAsignatura: '', idProfesor: '' });
-    setProfesores([]); // Reiniciar profesores para limpiar el selector
+    setProfesoresAsignatura([]); // Reiniciar profesores de la asignatura seleccionada
     setIsProfesorDisabled(false); // Restablecer el estado de deshabilitado
   };
 
@@ -158,10 +166,19 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
       // Obtener los ids_clases basados en las asignaturas y profesores seleccionados
       const idsClases: string[] = [];
       for (const clase of clasesAsignadas) {
+        console.log('Buscando clases para:', { idAsignatura: clase.idAsignatura, idProfesor: clase.idProfesor });
         const clasesData = await obtenerClasesAdmin(clase.idAsignatura, clase.idProfesor);
         console.log('Clases encontradas:', clasesData);
+
         if (clasesData && clasesData.length > 0) {
           idsClases.push(...clasesData.map((c: any) => c.id_clase));
+        } else {
+          // Obtener el nombre de la asignatura y del profesor para el mensaje de error
+          const asignatura = asignaturas.find(a => a.id_asignatura === clase.idAsignatura);
+          const profesor = todosProfesores.find(p => p.id_usuario === clase.idProfesor);
+          const nombreAsignatura = asignatura ? asignatura.nombre : clase.idAsignatura;
+          const nombreProfesor = profesor ? profesor.nombre : clase.idProfesor;
+          throw new Error(`No se encontraron clases para la asignatura ${nombreAsignatura} con el profesor ${nombreProfesor}.`);
         }
       }
 
@@ -177,12 +194,12 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
       setNuevoEstudiante({ nombre: '', apellido: '' });
       setClasesAsignadas([]);
       setNuevaClaseAsignada({ idAsignatura: '', idProfesor: '' });
-      setProfesores([]);
+      setProfesoresAsignatura([]);
       setFotos([]); // Reiniciar las fotos
       setIsProfesorDisabled(false);
     } catch (err: any) {
       console.error('Error al crear estudiante:', err);
-      setError(err.response?.data?.error || 'Error al crear el estudiante. Intenta de nuevo más tarde.');
+      setError(err.message || 'Error al crear el estudiante. Intenta de nuevo más tarde.');
     }
   };
 
@@ -266,13 +283,13 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
                             console.log('Profesor seleccionado:', e.target.value);
                             setNuevaClaseAsignada({ ...nuevaClaseAsignada, idProfesor: e.target.value });
                           }}
-                          disabled={isProfesorDisabled || !nuevaClaseAsignada.idAsignatura || profesores.length === 0}
+                          disabled={isProfesorDisabled || !nuevaClaseAsignada.idAsignatura || profesoresAsignatura.length === 0}
                           style={{ color: 'black', backgroundColor: 'white' }}
                         >
-                          {profesores.length > 1 && (
+                          {profesoresAsignatura.length > 1 && (
                             <option value="">Selecciona un profesor</option>
                           )}
-                          {profesores.map((profesor) => (
+                          {profesoresAsignatura.map((profesor) => (
                             <option key={profesor.id_usuario} value={profesor.id_usuario} style={{ color: 'black' }}>
                               {profesor.nombre}
                             </option>
@@ -301,8 +318,7 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
                         <ul className="list-group">
                           {clasesAsignadas.map((clase, index) => {
                             const asignatura = asignaturas.find(a => a.id_asignatura === clase.idAsignatura);
-                            const profesor = clase.idProfesor ? profesores.find(p => p.id_usuario === clase.idProfesor) : null;
-                            console.log('Clase asignada:', clase, 'Profesor encontrado:', profesor);
+                            const profesor = clase.idProfesor ? todosProfesores.find(p => p.id_usuario === clase.idProfesor) : null;
                             return (
                               <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
                                 {asignatura?.nombre || clase.idAsignatura} {profesor ? `(Profesor: ${profesor.nombre})` : '(Cualquier profesor)'}
