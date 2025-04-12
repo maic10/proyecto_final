@@ -1,74 +1,51 @@
 // src/components/admin/EditarHorarios.tsx
-import { useState, useEffect } from 'react';
-import { Horario, Clase, Aula } from '../../types/horarios';
-import { actualizarHorarios, obtenerClasesPorProfesor, obtenerAulas } from '../../state/api';
+import { useState } from 'react';
+import { Horario, Aula } from '../../types/horarios';
 
 interface EditarHorariosProps {
-  clase: Clase;
-  onUpdate: () => void;
+  horarios: Horario[];
+  setHorarios: React.Dispatch<React.SetStateAction<Horario[]>>;
+  aulas: Aula[];
+  error: string | null;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  cargando: boolean;
+  setCargando: React.Dispatch<React.SetStateAction<boolean>>;
+  diasValidos: string[];
+  nombresDias: { [key: string]: string };
+  validarSuperposicion: (nuevoHorario: Horario) => Promise<string | null>;
+  onSave: (nuevosHorarios: Horario[]) => void;
+  onCancel: () => void;
+  mensajeExito: string | null;
+  nombreAsignatura: string;
+  nombreProfesor: string;
 }
 
-const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
-  const [horarios, setHorarios] = useState<Horario[]>(clase.horarios);
+const EditarHorarios: React.FC<EditarHorariosProps> = ({
+  horarios,
+  setHorarios,
+  aulas,
+  error,
+  setError,
+  cargando,
+  setCargando,
+  diasValidos,
+  nombresDias,
+  validarSuperposicion,
+  onSave,
+  onCancel,
+  mensajeExito,
+  nombreAsignatura,
+  nombreProfesor
+}) => {
   const [nuevoHorario, setNuevoHorario] = useState<Horario>({
     dia: '',
     hora_inicio: '',
     hora_fin: '',
     id_aula: ''
   });
-  const [aulas, setAulas] = useState<Aula[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
-
-  const diasValidos = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-
-  // Cargar aulas al montar el componente
-  useEffect(() => {
-    const cargarAulas = async () => {
-      try {
-        const aulasData = await obtenerAulas();
-        setAulas(aulasData);
-        if (aulasData.length > 0) {
-          setNuevoHorario(prev => ({ ...prev, id_aula: '' }));
-        } else {
-          setError('No se encontraron aulas disponibles.');
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Error al cargar las aulas');
-      }
-    };
-    cargarAulas();
-  }, []);
-
-  // Actualizar horarios cuando cambie la clase seleccionada
-  useEffect(() => {
-    setHorarios(clase.horarios);
-  }, [clase]);
-
-  // Validar superposición con otros horarios del mismo profesor (en otras clases)
-  const validarSuperposicion = async (nuevoHorario: Horario) => {
-    try {
-      const clasesProfesor = await obtenerClasesPorProfesor(clase.id_usuario);
-      const horariosProfesor = clasesProfesor
-        .filter(c => c.id_clase !== clase.id_clase)
-        .flatMap(c => c.horarios);
-
-      for (const horarioExistente of horariosProfesor) {
-        if (nuevoHorario.dia === horarioExistente.dia) {
-          if (
-            (nuevoHorario.hora_inicio < horarioExistente.hora_fin) &&
-            (nuevoHorario.hora_fin > horarioExistente.hora_inicio)
-          ) {
-            return `El horario se superpone con otra clase del profesor: ${horarioExistente.dia} ${horarioExistente.hora_inicio}-${horarioExistente.hora_fin}`;
-          }
-        }
-      }
-      return null;
-    } catch (err: any) {
-      return 'Error al validar superposición con otras clases del profesor';
-    }
-  };
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [indexToDelete, setIndexToDelete] = useState<number | null>(null);
 
   // Validar superposición dentro de la misma clase
   const validarSuperposicionEnClaseActual = (nuevoHorario: Horario) => {
@@ -81,7 +58,7 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
           (nuevoHorario.hora_inicio < horarioExistente.hora_fin) &&
           (nuevoHorario.hora_fin > horarioExistente.hora_inicio)
         ) {
-          return `El horario se superpone con otro horario de la misma clase: ${horarioExistente.dia} ${horarioExistente.hora_inicio}-${horarioExistente.hora_fin}`;
+          return `El horario se superpone con otro horario de la misma clase: ${nombresDias[horarioExistente.dia as keyof typeof nombresDias]} ${horarioExistente.hora_inicio}-${horarioExistente.hora_fin}`;
         }
       }
     }
@@ -168,26 +145,22 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
   };
 
   const handleDeleteHorario = (index: number) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este horario?')) {
-      const nuevosHorarios = horarios.filter((_, i) => i !== index);
+    setIndexToDelete(index);
+    setShowConfirmModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (indexToDelete !== null) {
+      const nuevosHorarios = horarios.filter((_, i) => i !== indexToDelete);
       setHorarios(nuevosHorarios);
+      setShowConfirmModal(false);
+      setIndexToDelete(null);
     }
   };
 
-  const handleSave = async () => {
-    setCargando(true);
-    setError(null);
-    try {
-      await actualizarHorarios(clase.id_clase, horarios);
-      onUpdate();
-      alert('Horarios actualizados correctamente');
-      // Reiniciar el formulario a valores vacíos después de guardar
-      setNuevoHorario({ dia: '', hora_inicio: '', hora_fin: '', id_aula: '' });
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al actualizar los horarios');
-    } finally {
-      setCargando(false);
-    }
+  const cancelDelete = () => {
+    setShowConfirmModal(false);
+    setIndexToDelete(null);
   };
 
   // Mapear id_aula a nombre del aula
@@ -197,8 +170,20 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
   };
 
   return (
-    <div className="mt-4">
-      <h4>Horarios de la Clase</h4>
+    <div className="container py-5">
+      <h2 className="mb-2">Editar Horarios</h2>
+      {(nombreAsignatura || nombreProfesor) && (
+        <p className="mb-4 text-muted">
+          Clase: {nombreAsignatura || 'Desconocida'} - Profesor: {nombreProfesor || 'Desconocido'}
+        </p>
+      )}
+
+      {mensajeExito && (
+        <div className="alert alert-success" role="alert" aria-live="assertive">
+          {mensajeExito}
+        </div>
+      )}
+
       {error && (
         <div className="alert alert-danger" role="alert" aria-live="assertive">
           {error}
@@ -210,7 +195,7 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
         <ul className="list-group mb-3" role="list" aria-label="Lista de horarios">
           {horarios.map((horario, index) => (
             <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
-              {horario.dia.charAt(0).toUpperCase() + horario.dia.slice(1)}: {horario.hora_inicio} - {horario.hora_fin} (Aula: {getNombreAula(horario.id_aula)})
+              {nombresDias[horario.dia as keyof typeof nombresDias]}: {horario.hora_inicio} - {horario.hora_fin} (Aula: {getNombreAula(horario.id_aula)})
               <div>
                 <button
                   className="btn btn-warning btn-sm me-2"
@@ -252,7 +237,7 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
               >
                 <option value="">Selecciona un día</option>
                 {diasValidos.map(dia => (
-                  <option key={dia} value={dia}>{dia.charAt(0).toUpperCase() + dia.slice(1)}</option>
+                  <option key={dia} value={dia}>{nombresDias[dia as keyof typeof nombresDias]}</option>
                 ))}
               </select>
             </div>
@@ -313,22 +298,55 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({ clase, onUpdate }) => {
         </button>
       </div>
 
-      {/* Botón para guardar cambios */}
-      <button
-        className="btn btn-success"
-        onClick={handleSave}
-        disabled={cargando}
-        aria-label="Guardar cambios"
-      >
-        {cargando ? (
-          <>
-            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            Guardando...
-          </>
-        ) : (
-          'Guardar Cambios'
-        )}
-      </button>
+      {/* Modal de confirmación para eliminar */}
+      <div className={`modal fade ${showConfirmModal ? 'show d-block' : ''}`} tabIndex={-1} role="dialog" style={{ backgroundColor: showConfirmModal ? 'rgba(0,0,0,0.5)' : 'transparent' }}>
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Confirmar Eliminación</h5>
+              <button type="button" className="btn-close" onClick={cancelDelete} aria-label="Cerrar"></button>
+            </div>
+            <div className="modal-body">
+              <p>¿Estás seguro de que deseas eliminar este horario?</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={cancelDelete}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDelete}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Botones para guardar o cancelar */}
+      <div className="d-flex justify-content-between">
+        <button
+          className="btn btn-secondary"
+          onClick={onCancel}
+          disabled={cargando}
+          aria-label="Cancelar"
+        >
+          Cancelar
+        </button>
+        <button
+          className="btn btn-success"
+          onClick={() => onSave(horarios)}
+          disabled={cargando}
+          aria-label="Guardar cambios"
+        >
+          {cargando ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Guardando...
+            </>
+          ) : (
+            'Guardar Cambios'
+          )}
+        </button>
+      </div>
     </div>
   );
 };

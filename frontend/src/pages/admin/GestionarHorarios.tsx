@@ -1,14 +1,14 @@
 // src/pages/admin/GestionarHorarios.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clase, Profesor, Asignatura } from '../../types/horarios';
-import { obtenerProfesores, obtenerAsignaturas, obtenerClasesPorProfesor, obtenerClasesPorAsignatura, obtenerClasePorId } from '../../state/api';
-import EditarHorarios from '../../components/admin/EditarHorarios';
+import { obtenerProfesores, obtenerAsignaturas, obtenerClasesPorProfesor, obtenerClasesPorAsignatura } from '../../state/api';
 
 const GestionarHorarios: React.FC = () => {
+  const navigate = useNavigate();
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [clases, setClases] = useState<Clase[]>([]);
-  const [claseSeleccionada, setClaseSeleccionada] = useState<Clase | null>(null);
   const [filtroProfesor, setFiltroProfesor] = useState<string>('');
   const [filtroAsignatura, setFiltroAsignatura] = useState<string>('');
   const [filtroDebounced, setFiltroDebounced] = useState<string>(''); // Para debounce
@@ -58,7 +58,6 @@ const GestionarHorarios: React.FC = () => {
           clasesData = await obtenerClasesPorAsignatura(filtroAsignatura);
         }
         setClases(clasesData);
-        setClaseSeleccionada(null); // Resetear la clase seleccionada al cambiar el filtro
       } catch (err: any) {
         setError(err.response?.data?.error || 'Error al cargar las clases');
       } finally {
@@ -69,23 +68,11 @@ const GestionarHorarios: React.FC = () => {
       cargarClases();
     } else {
       setClases([]);
-      setClaseSeleccionada(null);
     }
   }, [filtroDebounced]);
 
   const handleSelectClase = (clase: Clase) => {
-    setClaseSeleccionada(clase);
-  };
-
-  const handleUpdate = async () => {
-    if (claseSeleccionada) {
-      try {
-        const claseActualizada = await obtenerClasePorId(claseSeleccionada.id_clase);
-        setClaseSeleccionada(claseActualizada);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Error al recargar la clase');
-      }
-    }
+    navigate(`/admin/horarios/editar/${clase.id_clase}`); // Redirigir a la página de edición
   };
 
   // Mapear IDs a nombres para mostrar en la lista
@@ -176,11 +163,10 @@ const GestionarHorarios: React.FC = () => {
               {clases.map(clase => (
                 <li
                   key={clase.id_clase}
-                  className={`list-group-item list-group-item-action ${claseSeleccionada?.id_clase === clase.id_clase ? 'active' : ''}`}
+                  className="list-group-item list-group-item-action"
                   onClick={() => handleSelectClase(clase)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSelectClase(clase)}
                   role="option"
-                  aria-selected={claseSeleccionada?.id_clase === clase.id_clase}
                   tabIndex={0}
                   style={{ cursor: 'pointer' }}
                 >
@@ -188,11 +174,6 @@ const GestionarHorarios: React.FC = () => {
                 </li>
               ))}
             </ul>
-
-            {/* Edición de horarios */}
-            {claseSeleccionada && (
-              <EditarHorarios clase={claseSeleccionada} onUpdate={handleUpdate} />
-            )}
           </>
         )}
       </div>

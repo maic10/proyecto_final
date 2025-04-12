@@ -2,12 +2,11 @@
 from flask_restx import Resource
 from src.servidor.api import ns
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.logica.database import get_user_by_id, clases_collection
+from src.logica.database import get_user_by_id, clases_collection, usuarios_collection, aulas_collection
 from src.logica.logger import logger
 from datetime import datetime
 from src.modelos.horarios import actualizar_horarios_model
 from src.modelos.clase import horario_model
-
 
 def se_superponen(nuevo, existente):
     """Verifica si dos horarios se superponen"""
@@ -38,7 +37,7 @@ class HorariosResource(Resource):
         nuevos_horarios = data.get("horarios", [])
 
         # Validaciones de formato y rango
-        dias_validos = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        dias_validos = ["lunes", "martes", "miércoles", "jueves", "viernes"]
         hora_minima = "08:00"
         hora_maxima = "22:00"
 
@@ -67,6 +66,10 @@ class HorariosResource(Resource):
 
         # Validar superposición con el mismo profesor
         profesor_id = clase["id_usuario"]
+        # Obtener el nombre del profesor
+        profesor = usuarios_collection.find_one({"id_usuario": profesor_id})
+        nombre_profesor = profesor["nombre"] if profesor else profesor_id
+
         otras_clases_profesor = clases_collection.find({
             "id_usuario": profesor_id,
             "id_clase": {"$ne": id_clase}
@@ -79,11 +82,17 @@ class HorariosResource(Resource):
             for horario_existente in horarios_profesor:
                 if se_superponen(nuevo_horario, horario_existente):
                     logger.error(f"Superposición de horario para el profesor {profesor_id}: {nuevo_horario} con {horario_existente}")
-                    return {"error": f"El horario se superpone con otra clase del profesor: {horario_existente['dia']} {horario_existente['hora_inicio']}-{horario_existente['hora_fin']}"}, 400
+                    return {
+                        "error": f"El horario se superpone con otra clase del profesor {nombre_profesor}: {horario_existente['dia']} {horario_existente['hora_inicio']}-{horario_existente['hora_fin']}"
+                    }, 400
 
         # Validar superposición en la misma aula
         for nuevo_horario in nuevos_horarios:
             id_aula = nuevo_horario["id_aula"]
+            # Obtener el nombre del aula
+            aula = aulas_collection.find_one({"id_aula": id_aula})
+            nombre_aula = aula["nombre"] if aula else id_aula
+
             otras_clases_aula = clases_collection.find({
                 "horarios.id_aula": id_aula,
                 "id_clase": {"$ne": id_clase}
@@ -96,8 +105,10 @@ class HorariosResource(Resource):
 
             for horario_existente in horarios_aula:
                 if se_superponen(nuevo_horario, horario_existente):
-                    logger.error(f"Superposición de horario en el aula {id_aula}: {nuevo_horario} con {horario_existente}")
-                    return {"error": f"El horario se superpone con otra clase en el aula {id_aula}: {horario_existente['dia']} {horario_existente['hora_inicio']}-{horario_existente['hora_fin']}"}, 400
+                    logger.error(f"Superposición de horario en el aula {nombre_aula}: {nuevo_horario} con {horario_existente}")
+                    return {
+                        "error": f"El horario se superpone con otra clase en el aula {nombre_aula}: {horario_existente['dia']} {horario_existente['hora_inicio']}-{horario_existente['hora_fin']}"
+                    }, 400
 
         # Actualizar los horarios en la base de datos
         clases_collection.update_one(

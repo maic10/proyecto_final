@@ -14,6 +14,7 @@ import PaginaGestionarEstudiantes from './pages/admin/PaginaGestionarEstudiantes
 import PaginaCrearEstudiante from './pages/admin/PaginaCrearEstudiante';
 import PaginaEditarEstudiante from './pages/admin/PaginaEditarEstudiante';
 import GestionarHorarios from './pages/admin/GestionarHorarios';
+import PaginaEditarHorarios from './pages/admin/PaginaEditarHorarios';
 import { estaAutenticado } from './state/auth';
 
 function AppWrapper() {
@@ -107,6 +108,14 @@ function AppWrapper() {
             </RutaPrivada>
           }
         />
+        <Route
+          path="/admin/horarios/editar/:id"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaEditarHorarios />
+            </RutaPrivada>
+          }
+        />        
         <Route path="*" element={<div className="container py-5"><h2>404 - Página no encontrada</h2><p>La ruta {location.pathname} no existe.</p></div>} />
       </Routes>
     </>

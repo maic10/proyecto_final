@@ -4,6 +4,17 @@ import pytz
 from .logger import logger
 from src.logica.database import *
 
+# Mapeo de días en inglés a español
+DIAS_EN_ESPANOL = {
+    "monday": "lunes",
+    "tuesday": "martes",
+    "wednesday": "miércoles",
+    "thursday": "jueves",
+    "friday": "viernes",
+    "saturday": "sábado",
+    "sunday": "domingo"
+}
+
 # Ajustar el indice en DB
 def cargar_embeddings_por_clase(id_clase):
     """
@@ -145,14 +156,14 @@ def obtener_clase_activa_para_aula(id_aula: str, detener: bool = False) -> str:
     now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
     zona_horaria = pytz.timezone("Europe/Madrid")
     now = now_utc.astimezone(zona_horaria)  # Convertir a otra zona
-    dia_actual = now.strftime("%A").lower()  # Ej. "monday"
+    dia_actual_ingles = now.strftime("%A").lower()  # Ej. "monday"
+    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles)  # Convertir a español, ej. "lunes"
     hora_actual = now.time()
     #print (f"[TRANSMISION] FEcha {now}")
     # Buscar clases que tengan un horario en el aula
     clases = list(clases_collection.find({"horarios.id_aula": id_aula}))
     
     for clase in clases:
-        #print (f"[TRANSMISION] Verificando clase {clase['id_clase']} en aula {id_aula}")
         for horario in clase["horarios"]:
             #print (f"[TRANSMISION] Verificando dia actual: {dia_actual}")
             #print (f"[TRANSMISION] Verificando horario: {horario}")
