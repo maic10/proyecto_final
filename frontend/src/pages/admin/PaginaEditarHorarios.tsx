@@ -141,9 +141,11 @@ const PaginaEditarHorarios: React.FC = () => {
   };
 
   // Días válidos en español
+  // Quitar sabado y domingo en prod 
   const diasValidos = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
   // Mapeo de días en español a nombres para mostrar
+  // Quitar sabado y domingo en prod 
   const nombresDias = {
     lunes: 'Lunes',
     martes: 'Martes',

@@ -43,10 +43,12 @@ class HorariosResource(Resource):
 
         for horario in nuevos_horarios:
             # Validar día
+            # Descomentarlo en Prod
+            """
             if horario["dia"] not in dias_validos:
                 logger.error(f"Día inválido: {horario['dia']}")
                 return {"error": f"Día inválido: {horario['dia']}. Debe ser lunes a viernes."}, 400
-
+            """
             # Validar formato de hora
             try:
                 datetime.strptime(horario["hora_inicio"], "%H:%M")
@@ -56,9 +58,12 @@ class HorariosResource(Resource):
                 return {"error": "Formato de hora inválido. Use HH:MM (24 horas)."}, 400
 
             # Validar rango de horas
+            # Descomentarlo en Prod
+            """ 
             if horario["hora_inicio"] < hora_minima or horario["hora_fin"] > hora_maxima:
                 logger.error(f"Horario fuera del rango permitido: {horario['hora_inicio']} - {horario['hora_fin']}")
                 return {"error": "El horario debe estar entre 08:00 y 22:00."}, 400
+            """
 
             if horario["hora_inicio"] >= horario["hora_fin"]:
                 logger.error(f"Hora de inicio debe ser anterior a la hora de fin: {horario['hora_inicio']} - {horario['hora_fin']}")
