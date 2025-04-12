@@ -1,3 +1,4 @@
+// src/pages/profesor/PaginaAsistenciaDetalle.tsx
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
@@ -9,13 +10,12 @@ function PaginaAsistenciaDetalle() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
-  // useSearchParams para leer ?fecha=...&id_clase=...
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
     cargarDetalle();
-  }, []); // se llama una sola vez al montar
+  }, []);
 
   const cargarDetalle = async () => {
     setCargando(true);
@@ -27,7 +27,6 @@ function PaginaAsistenciaDetalle() {
       return;
     }
 
-    // Leer los parámetros de la URL
     const fechaParam = searchParams.get('fecha');
     const idClaseParam = searchParams.get('id_clase');
 
@@ -51,6 +50,13 @@ function PaginaAsistenciaDetalle() {
   return (
     <div className="container py-4">
       <h2 className="mb-4">Detalle de Asistencia</h2>
+
+      <button
+        className="btn btn-secondary mb-3"
+        onClick={() => navigate('/asistencias')}
+      >
+        Volver al Historial
+      </button>
 
       {error && <div className="alert alert-danger">{error}</div>}
       {cargando && <p>Cargando...</p>}

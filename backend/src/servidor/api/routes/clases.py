@@ -88,7 +88,7 @@ class ClasesResource(Resource):
                 "horarios": horarios
             })
 
-        logger.info(f"Respuesta: {response}")
+        #logger.info(f"Respuesta: {response}")
         return response, 200
 
 @ns.route("/clases/<string:id_clase>")

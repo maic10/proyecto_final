@@ -6,7 +6,7 @@ import RutaPrivada from './components/common/RutaPrivada';
 import PaginaInicioSesion from './pages/common/PaginaInicioSesion';
 import PaginaPrincipal from './pages/profesor/PaginaPrincipal';
 import PaginaEstudiantes from './pages/profesor/PaginaEstudiantes';
-import PaginaAsistencias from './pages/profesor/PaginaAsistencias';
+import PaginaAsistencias from './pages/profesor/PaginaHistorialAsistencias';
 import PaginaAsistenciaDetalle from './pages/profesor/PaginaAsistenciaDetalle';
 import PaginaTransmision from './pages/profesor/PaginaTransmision';
 import PaginaPrincipalAdmin from './pages/admin/PaginaPrincipalAdmin';

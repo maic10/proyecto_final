@@ -1,3 +1,4 @@
+# /src/modelos/asistencia.py
 from flask_restx import fields
 from src.servidor.api import ns
 

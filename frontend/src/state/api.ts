@@ -38,25 +38,30 @@ export async function obtenerEstudiantesPorClase(id_clase: string) {
   return res.data;
 }
 
-export async function obtenerAsistenciasResumen(
-  idClase: string, 
-  fechaInicio?: string, 
-  fechaFin?: string
+// Obtener las asistencias listadas (resumen)
+export async function obtenerAsistenciasListado(
+  fechaInicio?: string,
+  fechaFin?: string,
+  idClase?: string
 ) {
   const token = obtenerToken();
-  const params: any = { id_clase: idClase };
+  const params: any = {};
   if (fechaInicio && fechaFin) {
     params.fecha_inicio = fechaInicio;
     params.fecha_fin = fechaFin;
   }
+  if (idClase) {
+    params.id_clase = idClase;
+  }
 
-  const res = await axios.get(`${API_BASE}/asistencias/resumen`, {
+  const res = await axios.get(`${API_BASE}/asistencias/listado`, {
     headers: { Authorization: `Bearer ${token}` },
     params
   });
-  return res.data; 
+  return res.data;
 }
 
+// Obtener los detalles de una asistencia
 export async function obtenerAsistenciaDetalle(idClase: string, fecha: string) {
   const token = obtenerToken();
   const res = await axios.get(`${API_BASE}/asistencias/detalle`, {
@@ -66,35 +71,32 @@ export async function obtenerAsistenciaDetalle(idClase: string, fecha: string) {
       fecha: fecha
     }
   });
-  return res.data; // Objeto { id_clase, fecha, id_aula, nombre_clase, nombre_aula, registros: [...] }
+  return res.data;
 }
 
-// NUEVA FUNCIÓN PARA EXPORTAR
-export async function exportarAsistenciasExcel(
-  idClase: string, 
-  fechaInicio: string, 
-  fechaFin: string
+// Exportar asistencias a CSV o Excel
+export async function exportarAsistencias(
+  fechaInicio: string,
+  fechaFin: string,
+  idClase?: string,
+  formato: 'xlsx' | 'csv' = 'xlsx'
 ) {
   const token = obtenerToken();
-  // Llamamos al endpoint, indicando 'responseType: blob' para recibir el archivo
+  const params: any = {
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+    formato: formato
+  };
+  if (idClase) {
+    params.id_clase = idClase;
+  }
+
   const res = await axios.get(`${API_BASE}/asistencias/exportar`, {
     headers: { Authorization: `Bearer ${token}` },
     responseType: 'blob',
-    params: {
-      id_clase: idClase,
-      fecha_inicio: fechaInicio,
-      fecha_fin: fechaFin
-    }
+    params
   });
-
-  // Creamos un objeto Blob e iniciamos la descarga
-  const url = window.URL.createObjectURL(new Blob([res.data]));
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', 'asistencias.xlsx');
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  return res.data;
 }
 
 export async function obtenerAsistencias(idClase: string) {
