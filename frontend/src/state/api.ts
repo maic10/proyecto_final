@@ -309,23 +309,6 @@ export const obtenerProfesores = async (): Promise<Profesor[]> => {
   return response.data;
 };
 
-export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clase[]> => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/clases`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { profesor: profesorId }
-  });
-  return response.data;
-};
-
-export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/clases`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { asignatura: asignaturaId }
-  });
-  return response.data;
-};
 
 export const obtenerClasePorId = async (idClase: string): Promise<Clase> => {
   const token = obtenerToken();
@@ -370,4 +353,12 @@ export const filtrarEstudiantes = async (
     console.error('Error al filtrar estudiantes:', err);
     return [];
   }
+};
+
+export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clase[]> => {
+  return await obtenerClasesAdmin(undefined, profesorId, undefined);
+};
+
+export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
+  return await obtenerClasesAdmin(asignaturaId, undefined, undefined);
 };

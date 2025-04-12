@@ -27,6 +27,7 @@ function PaginaPrincipal() {
       setNombre(perfil.name);
 
       const clasesData = await obtenerClases(usuario.id_usuario);
+      console.log('Clases obtenidas:', clasesData);
       setClases(clasesData);
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -42,7 +43,7 @@ function PaginaPrincipal() {
       const calcularClaseActivaOProxima = () => {
         const ahora = new Date();
         const diaActual = ahora.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
-        const diasSemana = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
         const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds(); // Hora actual en segundos
 
         // 1. Buscar una clase activa en el momento actual
@@ -50,6 +51,10 @@ function PaginaPrincipal() {
         for (const clase of clases) {
           for (const horario of clase.horarios) {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+            if (diaHorario === -1) {
+              console.error(`Día inválido en horario: ${horario.dia}`);
+              continue; // Saltar horarios con días inválidos
+            }
             if (diaHorario !== diaActual) continue;
 
             const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
@@ -88,6 +93,10 @@ function PaginaPrincipal() {
         clases.forEach((clase) => {
           clase.horarios.forEach((horario) => {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
+            if (diaHorario === -1) {
+              console.error(`Día inválido en horario: ${horario.dia}`);
+              return; // Saltar horarios con días inválidos
+            }
             const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
             const fechaInicio = new Date(ahora);
             fechaInicio.setHours(hora, minutos, 0, 0);

@@ -2,36 +2,62 @@
 from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
-from src.modelos.clase import clase_model
+from src.modelos.clase import clase_model,clase_model_clases
 from src.logica.database import get_user_by_id, get_asignatura_by_id, aulas_collection, clases_collection
 from src.logica.utils import get_clases_by_usuario
 from src.logica.logger import logger
 
 @ns.route("/clases")
 class ClasesResource(Resource):
-    @ns.doc(params={"id_usuario": "ID del profesor"})
+    @ns.doc(description="Obtener clases filtradas por profesor o asignatura (para profesores y administradores)")
+    @ns.doc(params={
+        "id_usuario": "ID del profesor (opcional, obligatorio para profesores si no se especifica asignatura)",
+        "asignatura": "ID de la asignatura (opcional)"
+    })
     @jwt_required()
-    @ns.marshal_list_with(clase_model)
+    @ns.marshal_list_with(clase_model_clases)  # Usamos el nuevo modelo
     def get(self):
-        """Obtiene las clases de un profesor con nombres de aulas"""
-        # Obtener el ID del usuario autenticado
+        """Obtener clases filtradas por profesor o asignatura"""
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "profesor":
-            return {"mensaje": "Acceso denegado"}, 403
+        if not user or (user["rol"] != "profesor" and user["rol"] != "admin"):
+            logger.error(f"Usuario {identity} no tiene permisos")
+            return {"error": "Acceso denegado"}, 403
 
-        # Obtener el id_usuario del parámetro (debe coincidir con el usuario autenticado)
         parser = reqparse.RequestParser()
-        parser.add_argument("id_usuario", type=str, required=True, help="ID del profesor")
+        parser.add_argument("id_usuario", type=str, location="args", required=False)
+        parser.add_argument("asignatura", type=str, location="args", required=False)
         args = parser.parse_args()
+
         id_usuario = args["id_usuario"]
+        asignatura = args["asignatura"]
 
-        if id_usuario != identity:
-            return {"mensaje": "No puedes consultar clases de otro profesor"}, 403
+        # Validaciones para profesores
+        if user["rol"] == "profesor":
+            if not id_usuario and not asignatura:
+                # Si es profesor y no se especifica ni id_usuario ni asignatura, usar su propio ID
+                id_usuario = identity
+            elif id_usuario and id_usuario != identity:
+                logger.error(f"Profesor {identity} intentó consultar clases de otro usuario: {id_usuario}")
+                return {"error": "No puedes consultar clases de otro profesor"}, 403
 
-        # Buscar las clases del profesor
-        clases = list(get_clases_by_usuario(id_usuario))
+        # Construir la consulta
+        query = {}
+        if id_usuario:
+            query["id_usuario"] = id_usuario
+        if asignatura:
+            query["id_asignatura"] = asignatura
+
+        # Si no se proporciona ningún parámetro y el usuario es admin, devolver todas las clases
+        if not query and user["rol"] != "admin":
+            logger.error(f"Profesor {identity} debe especificar al menos un filtro")
+            return {"error": "Debes especificar un id_usuario o asignatura"}, 400
+
+        clases = list(clases_collection.find(query))
+        if not clases:
+            logger.info(f"No se encontraron clases para la consulta: {query}")
+            return [], 200
 
         # Obtener todos los nombres de aulas en un solo query
         aula_ids = set()
@@ -41,68 +67,29 @@ class ClasesResource(Resource):
 
         aulas = {aula["id_aula"]: aula["nombre"] for aula in aulas_collection.find({"id_aula": {"$in": list(aula_ids)}})}
 
-        # Añadir nombre_aula a cada horario
-        for clase in clases:
-            for horario in clase.get("horarios", []):
-                horario["nombre_aula"] = aulas.get(horario["id_aula"], horario["id_aula"])
-
-        # Formatear respuesta con nombre_grupo, id_asignatura y nombre_asignatura separados
+        # Formatear respuesta con nombre_asignatura y nombre_aula
         response = []
-        for c in clases:
-            asignatura_doc = get_asignatura_by_id(c["id_asignatura"])
+        for clase in clases:
+            # Obtener el nombre de la asignatura
+            asignatura_doc = get_asignatura_by_id(clase["id_asignatura"])
+            if not asignatura_doc:
+                logger.error(f"Asignatura no encontrada para id_asignatura: {clase['id_asignatura']}")
             nombre_asignatura = asignatura_doc["nombre"] if asignatura_doc else "Asignatura desconocida"
-            nombre_grupo = c.get("nombre_grupo", "Grupo desconocido")
+
+            # Añadir nombre_aula a cada horario
+            horarios = clase.get("horarios", [])
+            for horario in horarios:
+                horario["nombre_aula"] = aulas.get(horario["id_aula"], "Aula desconocida")
 
             response.append({
-                "id_clase": c["id_clase"],
-                "id_asignatura": c["id_asignatura"],
-                "nombre_asignatura": nombre_asignatura,
-                "horarios": c.get("horarios", [])
-            })
-
-        return response, 200
-
-    @ns.doc(description="Obtener clases filtradas por profesor o asignatura (solo para administradores)")
-    @ns.doc(params={
-        "profesor": "ID del profesor (opcional)",
-        "asignatura": "ID de la asignatura (opcional)"
-    })
-    @jwt_required()
-    @ns.marshal_list_with(clase_model)
-    def get(self):
-        """Obtener clases filtradas por profesor o asignatura"""
-        identity = get_jwt_identity()
-        user = get_user_by_id(identity)
-
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
-            return {"error": "Acceso denegado"}, 403
-
-        parser = reqparse.RequestParser()
-        parser.add_argument("profesor", type=str, location="args", required=False)
-        parser.add_argument("asignatura", type=str, location="args", required=False)
-        args = parser.parse_args()
-
-        profesor = args["profesor"]
-        asignatura = args["asignatura"]
-
-        query = {}
-        if profesor:
-            query["id_usuario"] = profesor
-        if asignatura:
-            query["id_asignatura"] = asignatura
-
-        clases = clases_collection.find(query)
-        clases_list = [
-            {
                 "id_clase": clase["id_clase"],
                 "id_asignatura": clase["id_asignatura"],
-                "id_usuario": clase["id_usuario"],
-                "horarios": clase.get("horarios", [])
-            }
-            for clase in clases
-        ]
-        return clases_list, 200
+                "nombre_asignatura": nombre_asignatura,
+                "horarios": horarios
+            })
+
+        logger.info(f"Respuesta: {response}")
+        return response, 200
 
 @ns.route("/clases/<string:id_clase>")
 class ClaseResource(Resource):
