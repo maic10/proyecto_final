@@ -37,7 +37,7 @@ class HorariosResource(Resource):
         nuevos_horarios = data.get("horarios", [])
 
         # Validaciones de formato y rango
-        dias_validos = ["lunes", "martes", "miércoles", "jueves", "viernes"]
+        dias_validos = ["lunes", "martes", "miércoles", "jueves", "viernes","sábado", "domingo"]
         hora_minima = "08:00"
         hora_maxima = "22:00"
 

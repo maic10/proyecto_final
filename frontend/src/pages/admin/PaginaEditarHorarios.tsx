@@ -141,7 +141,7 @@ const PaginaEditarHorarios: React.FC = () => {
   };
 
   // Días válidos en español
-  const diasValidos = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'];
+  const diasValidos = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
   // Mapeo de días en español a nombres para mostrar
   const nombresDias = {
@@ -149,7 +149,9 @@ const PaginaEditarHorarios: React.FC = () => {
     martes: 'Martes',
     'miércoles': 'Miércoles',
     jueves: 'Jueves',
-    viernes: 'Viernes'
+    viernes: 'Viernes',
+    'sábado': 'Sábado',
+    domingo: 'Domingo',
   };
 
   if (cargando) {

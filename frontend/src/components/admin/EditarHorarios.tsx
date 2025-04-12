@@ -86,10 +86,12 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
     setError(null);
 
     // Validaciones básicas
+    /*
     if (!diasValidos.includes(nuevoHorario.dia)) {
       setError('El día debe ser de lunes a viernes.');
       return;
     }
+    */
 
     if (nuevoHorario.hora_inicio < '08:00' || nuevoHorario.hora_fin > '22:00') {
       setError('El horario debe estar entre 08:00 y 22:00.');
