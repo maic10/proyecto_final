@@ -1,9 +1,10 @@
 // src/pages/admin/PaginaGestionarEstudiantes.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
 import { Estudiante } from '../../types/estudiantes';
-import { obtenerEstudiantes, obtenerEstudiantePorId } from '../../state/api';
+import { Asignatura, Profesor } from '../../types/horarios';
+import { obtenerEstudiantes, obtenerEstudiantePorId, obtenerAsignaturas, obtenerProfesores, filtrarEstudiantes as fetchEstudiantesFiltrados } from '../../state/api';
 import ListaEstudiantes from '../../components/admin/ListaEstudiantes';
 
 const ITEMS_PER_PAGE = 5; // Número de estudiantes por página
@@ -12,17 +13,26 @@ const PaginaGestionarEstudiantes: React.FC = () => {
   const navigate = useNavigate();
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [estudiantesFiltrados, setEstudiantesFiltrados] = useState<Estudiante[]>([]);
-  const [estudiantesConImagenes, setEstudiantesConImagenes] = useState<{ [key: string]: Estudiante }>({}); // Estado para almacenar estudiantes con imágenes
+  const [estudiantesConFiltroAvanzado, setEstudiantesConFiltroAvanzado] = useState<Estudiante[]>([]);
+  const [estudiantesConImagenes, setEstudiantesConImagenes] = useState<{ [key: string]: Estudiante }>({});
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [asignaturasPorProfesor, setAsignaturasPorProfesor] = useState<{ [key: string]: Asignatura[] }>({});
+  const [profesoresPorAsignatura, setProfesoresPorAsignatura] = useState<{ [key: string]: Profesor[] }>({});
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState<string>(''); // Estado para el buscador
   const [busquedaDebounced, setBusquedaDebounced] = useState<string>(''); // Estado para el valor debounced
   const [ordenAscendente, setOrdenAscendente] = useState<boolean>(true); // Estado para el ordenamiento
   const [paginaActual, setPaginaActual] = useState<number>(1); // Estado para la paginación
-  const [filtroProfesor, setFiltroProfesor] = useState<string>(''); // Filtro por profesor
-  const [filtroAsignatura, setFiltroAsignatura] = useState<string>(''); // Filtro por asignatura
+  const [filtroProfesor, setFiltroProfesor] = useState<string>(''); // Filtro por profesor (ID)
+  const [filtroAsignatura, setFiltroAsignatura] = useState<string>(''); // Filtro por asignatura (ID)
+  const [usarFiltrosAvanzados, setUsarFiltrosAvanzados] = useState<boolean>(false); // Checkbox para habilitar filtros avanzados
 
-  // Cargar todos los estudiantes al montar el componente (sin imágenes)
+  // Mapa para rastrear solicitudes de imágenes en curso
+  const solicitudesImagenes = useRef<Map<string, Promise<Estudiante>>>(new Map());
+
+  // Cargar estudiantes al montar el componente (sin imágenes)
   useEffect(() => {
     const cargarEstudiantesInicial = async () => {
       setCargando(true);
@@ -35,12 +45,17 @@ const PaginaGestionarEstudiantes: React.FC = () => {
           return;
         }
 
-        const estudiantesData = await obtenerEstudiantes(undefined, false); // No cargar imágenes inicialmente
+        // Cargar estudiantes (sin imágenes inicialmente)
+        const estudiantesData = await obtenerEstudiantes(undefined, false);
+        console.log('Estudiantes iniciales:', estudiantesData);
         setEstudiantes(estudiantesData);
+        setEstudiantesConFiltroAvanzado(estudiantesData);
         setEstudiantesFiltrados(estudiantesData);
       } catch (err: any) {
         console.error('Error al cargar estudiantes:', err);
         setError('Error al cargar los estudiantes. Intenta de nuevo más tarde.');
+        setEstudiantesFiltrados([]); // Asegurar que sea un arreglo vacío en caso de error
+        setEstudiantesConFiltroAvanzado([]);
       } finally {
         setCargando(false);
       }
@@ -48,6 +63,80 @@ const PaginaGestionarEstudiantes: React.FC = () => {
 
     cargarEstudiantesInicial();
   }, []);
+
+  // Cargar asignaturas y profesores cuando se active el filtro avanzado
+  useEffect(() => {
+    if (!usarFiltrosAvanzados) {
+      // Si los filtros avanzados no están habilitados, no cargar datos adicionales
+      setAsignaturas([]);
+      setProfesores([]);
+      setFiltroProfesor('');
+      setFiltroAsignatura('');
+      setEstudiantesConFiltroAvanzado(estudiantes); // Restaurar la lista completa
+      return;
+    }
+
+    const cargarDatosFiltros = async () => {
+      setCargando(true);
+      setError(null);
+      try {
+        // Cargar asignaturas
+        const asignaturasData = await obtenerAsignaturas();
+        setAsignaturas(asignaturasData);
+
+        // Cargar profesores
+        const profesoresData = await obtenerProfesores();
+        setProfesores(profesoresData);
+
+        // Cargar asignaturas por profesor y profesores por asignatura
+        const asignaturasPorProfesorMap: { [key: string]: Asignatura[] } = {};
+        const profesoresPorAsignaturaMap: { [key: string]: Profesor[] } = {};
+        for (const asignatura of asignaturasData) {
+          profesoresPorAsignaturaMap[asignatura.id_asignatura] = [];
+        }
+
+        for (const profesor of profesoresData) {
+          const estudiantesProfesor = await fetchEstudiantesFiltrados(profesor.id_usuario, undefined, false);
+          console.log(`Estudiantes del profesor ${profesor.id_usuario}:`, estudiantesProfesor);
+          // Verificar que estudiantesProfesor sea un arreglo
+          if (!Array.isArray(estudiantesProfesor) || estudiantesProfesor.length === 0) {
+            asignaturasPorProfesorMap[profesor.id_usuario] = [];
+            continue;
+          }
+          const clasesProfesor = estudiantesProfesor
+            .filter(est => Array.isArray(est.ids_clases)) // Filtrar estudiantes con ids_clases válido
+            .flatMap((est: Estudiante) => est.ids_clases);
+          console.log(`Clases del profesor ${profesor.id_usuario}:`, clasesProfesor);
+          const clasesUnicas = [...new Set(clasesProfesor)];
+          const asignaturasProfesor = asignaturasData.filter((asignatura: Asignatura) =>
+            clasesUnicas.some((idClase: string) => idClase?.includes(asignatura.id_asignatura))
+          );
+          asignaturasPorProfesorMap[profesor.id_usuario] = [...new Set(asignaturasProfesor)];
+
+          // Asignar profesores a las asignaturas correspondientes
+          asignaturasProfesor.forEach((asignatura: Asignatura) => {
+            if (!profesoresPorAsignaturaMap[asignatura.id_asignatura].some(p => p.id_usuario === profesor.id_usuario)) {
+              profesoresPorAsignaturaMap[asignatura.id_asignatura].push(profesor);
+            }
+          });
+        }
+        setAsignaturasPorProfesor(asignaturasPorProfesorMap);
+        setProfesoresPorAsignatura(profesoresPorAsignaturaMap);
+
+        // Aplicar el filtrado inicial si ya hay valores seleccionados
+        await filtrarEstudiantes(filtroProfesor, filtroAsignatura);
+      } catch (err: any) {
+        console.error('Error al cargar datos de filtros:', err);
+        setError('Error al cargar asignaturas o profesores. Intenta de nuevo más tarde.');
+        setEstudiantesFiltrados([]); // Asegurar que sea un arreglo vacío en caso de error
+        setEstudiantesConFiltroAvanzado([]);
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargarDatosFiltros();
+  }, [usarFiltrosAvanzados, filtroProfesor, filtroAsignatura, estudiantes]);
 
   // Debounce para el filtro de búsqueda
   useEffect(() => {
@@ -60,12 +149,22 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     };
   }, [busqueda]);
 
-  // Filtrar estudiantes cuando cambie el valor debounced
+  // Aplicar el filtro por nombre siempre que cambie busquedaDebounced
   useEffect(() => {
-    filtrarEstudiantes(busquedaDebounced, filtroProfesor, filtroAsignatura);
-  }, [busquedaDebounced, filtroProfesor, filtroAsignatura]);
+    let filtrados = [...estudiantesConFiltroAvanzado];
 
-  // Manejar la búsqueda
+    // Filtrar por búsqueda (nombre/apellido)
+    if (busquedaDebounced) {
+      filtrados = filtrados.filter(estudiante =>
+        `${estudiante.nombre} ${estudiante.apellido}`.toLowerCase().includes(busquedaDebounced)
+      );
+    }
+
+    setEstudiantesFiltrados(filtrados);
+    setPaginaActual(1); // Resetear la página al filtrar
+  }, [busquedaDebounced, estudiantesConFiltroAvanzado]);
+
+  // Manejar la búsqueda por nombre
   const handleBusqueda = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valor = e.target.value.toLowerCase();
     setBusqueda(valor);
@@ -82,38 +181,41 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     setOrdenAscendente(!ordenAscendente);
   };
 
-  // Manejar el filtro por profesor o asignatura
-  const filtrarEstudiantes = (busqueda: string, profesor: string, asignatura: string) => {
-    let filtrados = [...estudiantes];
+  // Filtrar estudiantes usando la API (solo filtros avanzados)
+  const filtrarEstudiantes = async (profesor: string, asignatura: string) => {
+    let filtrados: Estudiante[] = [...estudiantes];
 
-    // Filtrar por búsqueda
-    if (busqueda) {
-      filtrados = filtrados.filter(estudiante =>
-        `${estudiante.nombre} ${estudiante.apellido}`.toLowerCase().includes(busqueda)
-      );
+    // Si los filtros avanzados están habilitados, usar la API para filtrar
+    if (usarFiltrosAvanzados && (profesor || asignatura)) {
+      try {
+        console.log('Filtrando estudiantes con:', { profesor, asignatura });
+        filtrados = await fetchEstudiantesFiltrados(profesor || undefined, asignatura || undefined, false);
+        console.log('Estudiantes filtrados:', filtrados);
+      } catch (err: any) {
+        console.error('Error al filtrar estudiantes:', err);
+        setError('Error al aplicar los filtros. Intenta de nuevo más tarde.');
+        filtrados = []; // Asegurar que filtrados sea un arreglo vacío en caso de error
+      }
     }
 
-    // Filtrar por profesor (simulado, necesitarás ajustar según tu backend)
-    if (profesor) {
-      filtrados = filtrados.filter(estudiante =>
-        estudiante.ids_clases.some(idClase => idClase.includes(profesor.toLowerCase()))
-      );
-    }
+    setEstudiantesConFiltroAvanzado(filtrados);
+  };
 
-    // Filtrar por asignatura (simulado, necesitarás ajustar según tu backend)
-    if (asignatura) {
-      filtrados = filtrados.filter(estudiante =>
-        estudiante.ids_clases.some(idClase => idClase.includes(asignatura.toLowerCase()))
-      );
-    }
+  // Manejar el cambio en el selector de profesor
+  const handleProfesorChange = (idProfesor: string) => {
+    setFiltroProfesor(idProfesor);
+    setFiltroAsignatura(''); // Reiniciar el filtro de asignatura al cambiar el profesor
+  };
 
-    setEstudiantesFiltrados(filtrados);
-    setPaginaActual(1); // Resetear la página al filtrar
+  // Manejar el cambio en el selector de asignatura
+  const handleAsignaturaChange = (idAsignatura: string) => {
+    setFiltroAsignatura(idAsignatura);
+    setFiltroProfesor(''); // Reiniciar el filtro de profesor al cambiar la asignatura
   };
 
   // Manejar la paginación
-  const totalPaginas = Math.ceil(estudiantesFiltrados.length / ITEMS_PER_PAGE);
-  const estudiantesPaginados = estudiantesFiltrados.slice(
+  const totalPaginas = Math.ceil((estudiantesFiltrados || []).length / ITEMS_PER_PAGE);
+  const estudiantesPaginados = (estudiantesFiltrados || []).slice(
     (paginaActual - 1) * ITEMS_PER_PAGE,
     paginaActual * ITEMS_PER_PAGE
   );
@@ -126,18 +228,27 @@ const PaginaGestionarEstudiantes: React.FC = () => {
 
       if (estudiantesSinImagenes.length === 0) return; // No hay estudiantes nuevos para cargar imágenes
 
-      const estudiantesConImagenesNuevos = await Promise.all(
-        estudiantesSinImagenes.map(async (id) => {
-          const estudianteConImagenes = await obtenerEstudiantePorId(id);
-          return estudianteConImagenes;
-        })
-      );
+      const promesasImagenes: Promise<Estudiante>[] = [];
+      estudiantesSinImagenes.forEach(id => {
+        // Verificar si ya hay una solicitud en curso para este estudiante
+        if (solicitudesImagenes.current.has(id)) {
+          promesasImagenes.push(solicitudesImagenes.current.get(id)!);
+        } else {
+          const promesa = obtenerEstudiantePorId(id);
+          solicitudesImagenes.current.set(id, promesa);
+          promesasImagenes.push(promesa);
+        }
+      });
+
+      const estudiantesConImagenesNuevos = await Promise.all(promesasImagenes);
 
       // Actualizar el estado de estudiantesConImagenes
       setEstudiantesConImagenes(prev => {
         const nuevosEstudiantes = { ...prev };
         estudiantesConImagenesNuevos.forEach(est => {
           nuevosEstudiantes[est.id_estudiante] = est;
+          // Eliminar la solicitud del mapa una vez que se completa
+          solicitudesImagenes.current.delete(est.id_estudiante);
         });
         return nuevosEstudiantes;
       });
@@ -152,12 +263,18 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     if (estudiantesPaginados.length > 0) {
       cargarImagenesEstudiantes(estudiantesPaginados);
     }
-  }, [paginaActual, estudiantesFiltrados]); // Se ejecuta cuando cambia la página o los estudiantes filtrados
+  }, [paginaActual, estudiantesPaginados]);
 
   // Combinar estudiantes paginados con sus imágenes
   const estudiantesPaginadosConImagenes = estudiantesPaginados.map(est => {
     return estudiantesConImagenes[est.id_estudiante] || est;
   });
+
+  // Obtener las asignaturas disponibles según el profesor seleccionado
+  const asignaturasDisponibles = filtroProfesor ? asignaturasPorProfesor[filtroProfesor] || [] : asignaturas;
+
+  // Obtener los profesores disponibles según la asignatura seleccionada
+  const profesoresDisponibles = filtroAsignatura ? profesoresPorAsignatura[filtroAsignatura] || [] : profesores;
 
   return (
     <div className="container py-5">
@@ -192,30 +309,57 @@ const PaginaGestionarEstudiantes: React.FC = () => {
             />
           </div>
           <div className="col-md-4">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Filtrar por profesor..."
-              value={filtroProfesor}
-              onChange={(e) => {
-                setFiltroProfesor(e.target.value);
-                filtrarEstudiantes(busquedaDebounced, e.target.value, filtroAsignatura);
-              }}
-            />
+            <div className="form-check">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="usarFiltrosAvanzados"
+                checked={usarFiltrosAvanzados}
+                onChange={(e) => setUsarFiltrosAvanzados(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="usarFiltrosAvanzados">
+                Habilitar filtros por profesor y asignatura
+              </label>
+            </div>
           </div>
           <div className="col-md-4">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Filtrar por asignatura..."
-              value={filtroAsignatura}
-              onChange={(e) => {
-                setFiltroAsignatura(e.target.value);
-                filtrarEstudiantes(busquedaDebounced, filtroProfesor, e.target.value);
-              }}
-            />
+            {/* Espacio vacío para mantener el diseño */}
           </div>
         </div>
+        {usarFiltrosAvanzados && (
+          <div className="row g-3 mt-2">
+            <div className="col-md-4">
+              <select
+                className="form-select"
+                value={filtroProfesor}
+                onChange={(e) => handleProfesorChange(e.target.value)}
+                disabled={cargando || (filtroAsignatura && profesoresDisponibles.length === 0)}
+              >
+                <option value="">Seleccionar profesor</option>
+                {profesoresDisponibles.map((profesor) => (
+                  <option key={profesor.id_usuario} value={profesor.id_usuario}>
+                    {profesor.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-4">
+              <select
+                className="form-select"
+                value={filtroAsignatura}
+                onChange={(e) => handleAsignaturaChange(e.target.value)}
+                disabled={cargando || (filtroProfesor && asignaturasDisponibles.length === 0)}
+              >
+                <option value="">Seleccionar asignatura</option>
+                {asignaturasDisponibles.map((asignatura) => (
+                  <option key={asignatura.id_asignatura} value={asignatura.id_asignatura}>
+                    {asignatura.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lista de estudiantes */}

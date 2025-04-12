@@ -3,13 +3,15 @@ from flask import request, jsonify
 from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
-from src.logica.database import get_user_by_id, estudiantes_collection, fs
+from src.logica.database import get_user_by_id, estudiantes_collection, fs, clases_collection
 from src.logica.utils import get_clases_by_usuario
+from src.modelos.estudiante import estudiante_model
 from src.logica.logger import logger
 from src.logica.gridfs_embeddings_generator import GridFSEmbeddingsGenerator
 from bson.objectid import ObjectId
 import base64
 import mimetypes
+
 
 @ns.route("/estudiantes")
 class EstudiantesResource(Resource):
@@ -433,3 +435,65 @@ class ServirImagen(Resource):
         except Exception as e:
             logger.error(f"Error al servir la imagen {file_id}: {e}")
             return {"error": "Imagen no encontrada"}, 404
+        
+@ns.route("/estudiantes/filtrar")
+class EstudiantesFiltrarResource(Resource):
+    @jwt_required()
+    @ns.doc(description="Filtrar estudiantes por profesor y/o asignatura (solo para administradores)")
+    @ns.doc(params={
+        "id_profesor": "ID del profesor (opcional)",
+        "id_asignatura": "ID de la asignatura (opcional)",
+        "incluir_foto": "Incluir fotos de los estudiantes (true/false, por defecto false)"
+    })
+    @ns.marshal_list_with(estudiante_model)
+    def get(self):
+        """Filtrar estudiantes por profesor y/o asignatura"""
+        identity = get_jwt_identity()
+        user = get_user_by_id(identity)
+
+        if not user or user["rol"] != "admin":
+            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+            return {"error": "Acceso denegado"}, 403
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("id_profesor", type=str, location="args", required=False)
+        parser.add_argument("id_asignatura", type=str, location="args", required=False)
+        parser.add_argument("incluir_foto", type=str, location="args", default="false")
+        args = parser.parse_args()
+
+        id_profesor = args["id_profesor"]
+        id_asignatura = args["id_asignatura"]
+        incluir_foto = args["incluir_foto"].lower() == "true"
+
+        # Construir la consulta para las clases
+        query_clases = {}
+        if id_profesor:
+            query_clases["id_usuario"] = id_profesor
+        if id_asignatura:
+            query_clases["id_asignatura"] = id_asignatura
+
+        # Obtener las clases que cumplen con los criterios
+        clases_filtradas = list(clases_collection.find(query_clases))
+        if not clases_filtradas:
+            logger.info("No se encontraron clases para los criterios de filtrado")
+            return [], 200
+
+        # Obtener los IDs de las clases filtradas
+        ids_clases_filtradas = [clase["id_clase"] for clase in clases_filtradas]
+
+        # Buscar estudiantes que estén asignados a esas clases
+        query_estudiantes = {
+            "ids_clases": {"$in": ids_clases_filtradas}
+        }
+        estudiantes = list(estudiantes_collection.find(query_estudiantes))
+
+        # Procesar los estudiantes
+        for estudiante in estudiantes:
+            estudiante["_id"] = str(estudiante["_id"])
+            # Asegurar que ids_clases sea un arreglo, incluso si no está definido
+            estudiante["ids_clases"] = estudiante.get("ids_clases", [])
+            if not incluir_foto:
+                estudiante.pop("imagenes", None)
+
+        logger.info(f"Estudiantes encontrados: {len(estudiantes)}")
+        return estudiantes, 200

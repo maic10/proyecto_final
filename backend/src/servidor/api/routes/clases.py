@@ -135,7 +135,7 @@ class ClasesAdminResource(Resource):
     @jwt_required()
     @ns.doc(description="Obtener clases basadas en asignatura, profesor o ID de clase (para administradores)")
     @ns.doc(params={
-        "id_asignatura": "ID de la asignatura (requerido si no se proporciona id_clase)",
+        "id_asignatura": "ID de la asignatura (opcional)",
         "id_usuario": "ID del usuario/profesor (opcional)",
         "id_clase": "ID de la clase (opcional, si se proporciona, se ignoran id_asignatura e id_usuario)"
     })
@@ -159,19 +159,18 @@ class ClasesAdminResource(Resource):
         id_usuario = args["id_usuario"]
         id_clase = args["id_clase"]
 
-        # Validar que se proporcione al menos id_clase o id_asignatura
-        if not id_clase and not id_asignatura:
-            return {"error": "Se requiere id_clase o id_asignatura"}, 400
-
         # Construir la consulta
         query = {}
         if id_clase:
             query["id_clase"] = id_clase
         else:
-            query["id_asignatura"] = id_asignatura
+            # Permitir buscar solo por id_usuario o id_asignatura
+            if id_asignatura:
+                query["id_asignatura"] = id_asignatura
             if id_usuario:
                 query["id_usuario"] = id_usuario
 
+        # Si no se proporciona ningún parámetro, devolver todas las clases
         clases = list(clases_collection.find(query))
         for clase in clases:
             clase["_id"] = str(clase["_id"])

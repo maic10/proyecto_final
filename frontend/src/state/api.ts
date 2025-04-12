@@ -3,6 +3,7 @@ import axios from 'axios';
 import { obtenerToken, obtenerUsuario } from './auth';
 import { API_BASE } from '../utils/constants';
 import { Horario, Clase, Profesor, Asignatura,Aula } from '../types/horarios';
+import { Estudiante } from '../types/estudiantes';
 
 export async function iniciarSesion(correo: string, contraseña: string) {
   const res = await axios.post(`${API_BASE}/autenticacion/iniciar_sesion`, {
@@ -347,4 +348,26 @@ export const obtenerAulas = async (): Promise<Aula[]> => {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
+};
+
+export const filtrarEstudiantes = async (
+  idProfesor?: string,
+  idAsignatura?: string,
+  incluirFoto: boolean = false
+): Promise<Estudiante[]> => {
+  try {
+    const token = obtenerToken();
+    const params: any = { incluir_foto: incluirFoto.toString() };
+    if (idProfesor) params.id_profesor = idProfesor;
+    if (idAsignatura) params.id_asignatura = idAsignatura;
+
+    const response = await axios.get(`${API_BASE}/estudiantes/filtrar`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params,
+    });
+    return response.data || [];
+  } catch (err: any) {
+    console.error('Error al filtrar estudiantes:', err);
+    return [];
+  }
 };
