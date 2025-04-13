@@ -1,41 +1,66 @@
 // src/state/api.ts
 import axios from 'axios';
-import { obtenerToken, obtenerUsuario } from './auth';
+import { obtenerToken, obtenerUsuario, cerrarSesion } from './auth';
 import { API_BASE } from '../utils/constants';
 import { Horario, Clase, Profesor, Asignatura,Aula } from '../types/horarios';
 import { Estudiante } from '../types/estudiantes';
 
+// Crear una instancia de axios
+const axiosInstance = axios.create({
+  baseURL: API_BASE,
+});
+
+// Interceptor de solicitud: Añadir el token a las solicitudes
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = obtenerToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Interceptor de respuesta: Manejar errores 401
+axiosInstance.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Cerrar sesión y redirigir al login
+      cerrarSesion();
+      window.location.href = '/'; 
+      // Evitar que el error cause un bucle infinito
+      return new Promise(() => {});
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function iniciarSesion(correo: string, contraseña: string) {
-  const res = await axios.post(`${API_BASE}/autenticacion/iniciar_sesion`, {
+  const res = await axiosInstance.post('/autenticacion/iniciar_sesion', {
     correo,
     contraseña
   });
-  return res.data;
+  return res;
 }
 
 export async function obtenerPerfil() {
-    const token = obtenerToken();
-    const res = await axios.get(`${API_BASE}/autenticacion/perfil`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return res.data;
+  const res = await axiosInstance.get('/autenticacion/perfil');
+  return res;
 }
 
 export async function obtenerClases(id_usuario: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/clases?id_usuario=${id_usuario}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data;
+  const params = { id_usuario };
+  const res = await axiosInstance.get('/clases', { params });
+  return res;
 }
 
  // Para obtener estudiantes de una clase
 export async function obtenerEstudiantesPorClase(id_clase: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/estudiantes?class_id=${id_clase}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data;
+  const params = { class_id: id_clase };
+  const res = await axiosInstance.get('/estudiantes', { params });
+  return res;
 }
 
 // Obtener las asistencias listadas (resumen)
@@ -44,7 +69,6 @@ export async function obtenerAsistenciasListado(
   fechaFin?: string,
   idClase?: string
 ) {
-  const token = obtenerToken();
   const params: any = {};
   if (fechaInicio && fechaFin) {
     params.fecha_inicio = fechaInicio;
@@ -54,85 +78,65 @@ export async function obtenerAsistenciasListado(
     params.id_clase = idClase;
   }
 
-  const res = await axios.get(`${API_BASE}/asistencias/listado`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params
-  });
-  return res.data;
+  const res = await axiosInstance.get('/asistencias/listado', { params });
+  return res;
 }
 
 // Obtener los detalles de una asistencia
 export async function obtenerAsistenciaDetalle(idClase: string, fecha: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/asistencias/detalle`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: {
-      id_clase: idClase,
-      fecha: fecha
-    }
-  });
-  return res.data;
+  const params = {
+    id_clase: idClase,
+    fecha: fecha
+  };
+  const res = await axiosInstance.get('/asistencias/detalle', { params });
+  return res;
 }
 
 // Exportar asistencias a CSV o Excel
 export async function exportarAsistencias(
-  fechaInicio: string,
-  fechaFin: string,
+  fechaInicio?: string,
+  fechaFin?: string,
   idClase?: string,
   formato: 'xlsx' | 'csv' = 'xlsx'
 ) {
-  const token = obtenerToken();
   const params: any = {
-    fecha_inicio: fechaInicio,
-    fecha_fin: fechaFin,
     formato: formato
   };
   if (idClase) {
     params.id_clase = idClase;
   }
+  if (fechaInicio && fechaFin) {
+    params.fecha_inicio = fechaInicio;
+    params.fecha_fin = fechaFin;
+  }
 
-  const res = await axios.get(`${API_BASE}/asistencias/exportar`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await axiosInstance.get('/asistencias/exportar', {
     responseType: 'blob',
     params
   });
-  return res.data;
+  return res;
 }
 
 export async function obtenerAsistencias(idClase: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/asistencias/${idClase}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data;
+  const res = await axiosInstance.get(`/asistencias/${idClase}`);
+  return res;
 }
 
 export async function obtenerAsistenciasActual(idClase: string, fecha: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/asistencias/actual`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { id_clase: idClase, fecha }
-  });
-  return res.data;
+  const params = { id_clase: idClase, fecha };
+  const res = await axiosInstance.get('/asistencias/actual', { params });
+  return res;
 }
 
 export async function actualizarEstadoAsistencia(idEstudiante: string, idClase: string, fecha: string, estado: string) {
-  const token = obtenerToken();
-  const res = await axios.put(
-    `${API_BASE}/asistencias/${idEstudiante}`,
-    { id_clase: idClase, fecha, estado },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return res.data;
+  const res = await axiosInstance.put(`/asistencias/${idEstudiante}`, { id_clase: idClase, fecha, estado });
+  return res;
 }
 
 export async function verificarEstadoTransmision(idClase: string) {
-  const token = obtenerToken();
-  const res = await axios.get(`${API_BASE}/estado_web`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { id_clase: idClase }
-  });
-  return res.data;
+  const params = { id_clase: idClase };
+  const res = await axiosInstance.get('/estado_web', { params });
+  return res;
 }
 
 export async function obtenerAsistenciasEstudiante(
@@ -141,12 +145,6 @@ export async function obtenerAsistenciasEstudiante(
   fechaInicio?: string,
   fechaFin?: string
 ) {
-  const token = obtenerToken();
-  if (!token) {
-    console.error('Token no encontrado. Redirigiendo al login...');
-    throw new Error('No se encontró un token de autenticación');
-  }
-
   const params: any = { id_clase: idClase, id_estudiante: idEstudiante };
   if (fechaInicio && fechaFin) {
     params.fecha_inicio = fechaInicio;
@@ -154,11 +152,8 @@ export async function obtenerAsistenciasEstudiante(
   }
 
   try {
-    const res = await axios.get(`${API_BASE}/asistencias/estudiante`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params
-    });
-    return res.data;
+    const res = await axiosInstance.get('/asistencias/estudiante', { params });
+    return res;
   } catch (error) {
     console.error('Error en obtenerAsistenciasEstudiante:', error.response?.data || error.message);
     throw error;
@@ -166,7 +161,6 @@ export async function obtenerAsistenciasEstudiante(
 }
 
 export const obtenerEstudiantes = async (classId?: string, includePhotos: boolean = false) => {
-  const token = obtenerToken();
   const usuario = obtenerUsuario();
 
   if (!usuario) {
@@ -181,158 +175,86 @@ export const obtenerEstudiantes = async (classId?: string, includePhotos: boolea
     params.class_id = classId;
   }
 
-  const response = await axios.get(`${API_BASE}/estudiantes`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    params,
-  });
-  return response.data;
+  const res = await axiosInstance.get('/estudiantes', { params });
+  return res;
 };
 
 export const subirImagenEstudiante = async (idEstudiante: string, imagen: File) => {
-  const token = obtenerToken();
   const formData = new FormData();
   formData.append('imagen', imagen);
 
-  const response = await axios.post(
-    `${API_BASE}/estudiantes/${idEstudiante}/subir-imagen`,
-    formData,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    }
-  );
-  return response.data;
+  const res = await axiosInstance.post(`/estudiantes/${idEstudiante}/subir-imagen`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res;
 };
 
 export const crearEstudiante = async (nombre: string, apellido: string, idsClases: string[]) => {
-  const token = obtenerToken();
-  const response = await axios.post(
-    `${API_BASE}/estudiantes/nuevo`,
-    { nombre, apellido, ids_clases: idsClases },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-  return response.data;
+  const res = await axiosInstance.post('/estudiantes/nuevo', { nombre, apellido, ids_clases: idsClases });
+  return res;
 };
 
 export const actualizarEstudiante = async (idEstudiante: string, nombre: string, apellido: string, idsClases: string[]) => {
-  const token = obtenerToken();
-  const response = await axios.put(
-    `${API_BASE}/estudiantes/${idEstudiante}`,
-    { nombre, apellido, ids_clases: idsClases },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-  return response.data;
+  const res = await axiosInstance.put(`/estudiantes/${idEstudiante}`, { nombre, apellido, ids_clases: idsClases });
+  return res;
 };
 
 export const obtenerEstudiantePorId = async (idEstudiante: string) => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/estudiantes/${idEstudiante}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
+  const res = await axiosInstance.get(`/estudiantes/${idEstudiante}`);
+  return res;
 };
 
 export const eliminarEstudiante = async (idEstudiante: string) => {
-  const token = obtenerToken();
-  const response = await axios.delete(`${API_BASE}/estudiantes/${idEstudiante}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
+  const res = await axiosInstance.delete(`/estudiantes/${idEstudiante}`);
+  return res;
 };
 
 export const eliminarImagenEstudiante = async (idEstudiante: string, fileId: string) => {
-  const token = obtenerToken();
-  const response = await axios.delete(`${API_BASE}/estudiantes/${idEstudiante}/imagenes/${fileId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
+  const res = await axiosInstance.delete(`/estudiantes/${idEstudiante}/imagenes/${fileId}`);
+  return res;
 };
 
 export const obtenerAsignaturas = async () => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/asignaturas`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
+  const res = await axiosInstance.get('/asignaturas');
+  return res;
 };
 
 export const obtenerProfesoresPorAsignatura = async (idAsignatura: string) => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/asignaturas/${idAsignatura}/profesores`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
+  const res = await axiosInstance.get(`/asignaturas/${idAsignatura}/profesores`);
+  return res;
 };
 
 export const obtenerClasesAdmin = async (idAsignatura?: string, idUsuario?: string, idClase?: string) => {
-  const token = obtenerToken();
   const params: { [key: string]: string | undefined } = {
     id_asignatura: idAsignatura,
     id_usuario: idUsuario,
     id_clase: idClase,
   };
 
-  const response = await axios.get(`${API_BASE}/clases-admin`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    params,
-  });
-  return response.data;
+  const res = await axiosInstance.get('/clases-admin', { params });
+  return res;
 };
 
 export const obtenerProfesores = async (): Promise<Profesor[]> => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/profesor/profesores`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
+  const res = await axiosInstance.get('/profesor/profesores');
+  return res;
 };
 
 
 export const obtenerClasePorId = async (idClase: string): Promise<Clase> => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/clases/${idClase}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
+  const res = await axiosInstance.get(`/clases/${idClase}`);
+  return res;
 };
 
 export const actualizarHorarios = async (idClase: string, horarios: Horario[]): Promise<void> => {
-  const token = obtenerToken();
-  await axios.put(`${API_BASE}/clases/${idClase}/horarios`, { horarios }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  await axiosInstance.put(`/clases/${idClase}/horarios`, { horarios });
 };
 
 export const obtenerAulas = async (): Promise<Aula[]> => {
-  const token = obtenerToken();
-  const response = await axios.get(`${API_BASE}/aulas`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
+  const res = await axiosInstance.get('/aulas');
+  return res;
 };
 
 export const filtrarEstudiantes = async (
@@ -341,16 +263,12 @@ export const filtrarEstudiantes = async (
   incluirFoto: boolean = false
 ): Promise<Estudiante[]> => {
   try {
-    const token = obtenerToken();
     const params: any = { incluir_foto: incluirFoto.toString() };
     if (idProfesor) params.id_profesor = idProfesor;
     if (idAsignatura) params.id_asignatura = idAsignatura;
 
-    const response = await axios.get(`${API_BASE}/estudiantes/filtrar`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params,
-    });
-    return response.data || [];
+    const res = await axiosInstance.get('/estudiantes/filtrar', { params });
+    return res || [];
   } catch (err: any) {
     console.error('Error al filtrar estudiantes:', err);
     return [];

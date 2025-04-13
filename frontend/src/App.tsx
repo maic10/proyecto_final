@@ -1,8 +1,8 @@
 // src/App.tsx
-import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import BarraNavegacion from './components/common/BarraNavegacion';
 import RutaPrivada from './components/common/RutaPrivada';
+import { AuthProvider } from './state/AuthProvider'; 
 import PaginaInicioSesion from './pages/common/PaginaInicioSesion';
 import PaginaPrincipal from './pages/profesor/PaginaPrincipal';
 import PaginaEstudiantes from './pages/profesor/PaginaEstudiantes';
@@ -115,7 +115,7 @@ function AppWrapper() {
               <PaginaEditarHorarios />
             </RutaPrivada>
           }
-        />        
+        />
         <Route path="*" element={<div className="container py-5"><h2>404 - Página no encontrada</h2><p>La ruta {location.pathname} no existe.</p></div>} />
       </Routes>
     </>
@@ -123,12 +123,11 @@ function AppWrapper() {
 }
 
 function App() {
-  useEffect(() => {
-    document.documentElement.setAttribute('data-bs-theme', 'light');
-  }, []);
   return (
     <Router>
-      <AppWrapper />
+      <AuthProvider>
+        <AppWrapper />
+      </AuthProvider>
     </Router>
   );
 }
