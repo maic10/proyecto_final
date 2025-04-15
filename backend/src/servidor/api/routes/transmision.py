@@ -98,8 +98,12 @@ class EstadoTransmision(Resource):
                 rpi_data = transmisiones_activas.get(id_clase, {})
                 if rpi_data and rpi_data["id_rpi"] == id_rpi:
                     try:
+                        # Enviar el token JWT en los encabezados
+                        token = request.headers.get("Authorization").split(" ")[1]  # Obtener el token del encabezado
+                        headers = {"Authorization": f"Bearer {token}"}
                         requests.post(
                             f"http://{rpi_data['ip']}:{rpi_data['port']}/stop_transmission",
+                            headers=headers,
                             timeout=5
                         )
                         logger.info(f"Notificación de parada enviada a {rpi_data['ip']}:{rpi_data['port']}")
