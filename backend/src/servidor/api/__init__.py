@@ -41,7 +41,7 @@ from src.servidor.api.routes.clases import *
 from src.servidor.api.routes.asistencias import *
 from src.servidor.api.routes.raspberry import *
 from src.servidor.api.routes.estudiantes import *
-from src.servidor.api.routes.video import *
+#from src.servidor.api.routes.video import *
 from src.servidor.api.routes.transmision import *
 from src.servidor.api.routes.asignaturas import *
 from src.servidor.api.routes.horarios import *

@@ -12,68 +12,15 @@ from src.logica.utils import (
     registrar_asistencia_en_db
 )
 
-MODO_LOCAL = True
-MODO_LOCAL_CAMARA = False # Cambiar a False para usar un video pregrabado
+MODO_LOCAL = False
+MODO_LOCAL_CAMARA = False
 VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
-
-transmisiones = {}
 
 # Intervalo para registrar asistencias (en segundos)
 INTERVALO_REGISTRO_ASISTENCIA = 10
 
-def detener_transmision(id_clase=None):
-    global transmisiones
-    if id_clase:
-        if id_clase not in transmisiones:
-            logger.warning(f"No hay transmisión activa para clase {id_clase}")
-            return
-        transmision = transmisiones[id_clase]
-        logger.info(f"Deteniendo transmisión para clase {id_clase}")
-        transmision["detener_evento"].set()
-        # Registrar las detecciones pendientes antes de detener
-        with transmision["detecciones_lock"]:
-            for id_estudiante, confianza in transmision["detecciones_temporales"].items():
-                registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
-            transmision["detecciones_temporales"].clear()
-        if transmision.get("proceso_ffmpeg"):
-            transmision["proceso_ffmpeg"].terminate()
-        del transmisiones[id_clase]
-        logger.info(f"Transmisión detenida para clase {id_clase}")
-    else:
-        for clase in list(transmisiones.keys()):
-            detener_transmision(clase)
-
-def hay_transmision_activa(id_clase=None):
-    if id_clase:
-        return id_clase in transmisiones
-    return bool(transmisiones)
-
-def iniciar_transmision_para_clase(id_clase):
-    global transmisiones
-    if id_clase in transmisiones:
-        logger.warning(f"Ya hay una transmisión activa para clase {id_clase}, deteniendo...")
-        detener_transmision(id_clase)
-
-    transmision = {
-        "frame": None,
-        "lock": threading.Lock(),
-        "detener_evento": threading.Event(),
-        "proceso_ffmpeg": None,
-        "detecciones_temporales": {},  # Caché para detecciones (id_estudiante: confianza)
-        "detecciones_lock": threading.Lock()  # Lock para la caché
-    }
-    transmisiones[id_clase] = transmision
-    logger.debug(f"Evento detener inicializado para clase {id_clase}: {transmision['detener_evento'].is_set()}")
-
-    hilo_recepcion = threading.Thread(
-        target=_recepcion_loop_por_clase,
-        args=(id_clase, transmision),
-        daemon=True
-    )
-    hilo_recepcion.start()
-    logger.info(f"Hilo de recepción lanzado para clase {id_clase}, nombre del hilo: {hilo_recepcion.name}")
-
 def _log_ffmpeg_stderr(process):
+    """Registra los mensajes de error de FFmpeg en un hilo separado."""
     while True:
         stderr_line = process.stderr.readline().decode().strip()
         if not stderr_line and process.poll() is not None:
@@ -81,160 +28,216 @@ def _log_ffmpeg_stderr(process):
         if stderr_line:
             logger.debug(f"[FFMPEG] {stderr_line}")
 
-def _registrar_asistencias_periodicamente(id_clase, transmision):
-    """
-    Hilo que registra asistencias periódicamente desde la caché.
-    """
-    while not transmision["detener_evento"].is_set():
-        time.sleep(INTERVALO_REGISTRO_ASISTENCIA)
-        with transmision["detecciones_lock"]:
-            if not transmision["detecciones_temporales"]:
-                continue
-            logger.debug(f"Registrando asistencias para clase {id_clase}: {transmision['detecciones_temporales']}")
-            for id_estudiante, confianza in transmision["detecciones_temporales"].items():
-                registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
-            transmision["detecciones_temporales"].clear()
+def detener_transmision(transmision_or_id_clase):
+    logger.info(f"Deteniendo transmisión maic1020")
+    if isinstance(transmision_or_id_clase, str):  # Si es un ID de clase
+        id_clase = transmision_or_id_clase
+        if id_clase not in transmisiones_activas:
+            logger.warning(f"No hay transmisión activa para clase {id_clase}")
+            return
+        transmision = transmisiones_activas[id_clase]["transmision"]
+    else:  # Si es un diccionario de transmisión
+        transmision = transmision_or_id_clase
 
-def _recepcion_loop_por_clase(id_clase, transmision):
-    try:
-        logger.info(f"Iniciando recepción de video para clase {id_clase} en hilo {threading.current_thread().name}")
-        logger.debug(f"Estado inicial de detener_evento: {transmision['detener_evento'].is_set()}")
-        width, height = 640, 480
-        embeddings_dict = cargar_embeddings_por_clase(id_clase)
-        tracker = FaceTracker(embeddings_dict=embeddings_dict)
+    logger.info(f"Deteniendo transmisión para clase {transmision['id_clase']}")
+    transmision["detener_evento"].set()
+    # Registrar las detecciones pendientes antes de detener
+    with transmision["detecciones_lock"]:
+        for id_estudiante, confianza in transmision["detecciones_temporales"].items():
+            registrar_asistencia_en_db(transmision["id_clase"], id_estudiante, confianza)
+        transmision["detecciones_temporales"].clear()
+    if transmision.get("proceso_ffmpeg"):
+        transmision["proceso_ffmpeg"].terminate()
+        transmision["proceso_ffmpeg"].wait()  # Asegurar que el proceso FFmpeg termine
+    logger.info(f"Transmisión detenida para clase {transmision['id_clase']}")
+    # Cerrar todas las ventanas de OpenCV
+    cv2.destroyAllWindows()
 
-        # Iniciar el hilo para registrar asistencias periódicamente
-        hilo_registro = threading.Thread(
-            target=_registrar_asistencias_periodicamente,
-            args=(id_clase, transmision),
-            daemon=True
-        )
-        hilo_registro.start()
+def hay_transmision_activa(transmision):
+    return not transmision["detener_evento"].is_set()
 
-        if MODO_LOCAL:
-            logger.info("Modo local activo")
-            cap = cv2.VideoCapture(0) if MODO_LOCAL_CAMARA else cv2.VideoCapture(VIDEO_TEST_PATH)
-            if not cap.isOpened():
-                logger.error("No se pudo abrir la fuente de video local")
-                detener_transmision(id_clase)
-                return
+def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision):
+    logger.debug(f"Evento detener inicializado para clase {id_clase}: {transmision['detener_evento'].is_set()}")
+
+    width, height = 640, 480
+    embeddings_dict = cargar_embeddings_por_clase(id_clase)
+    tracker = FaceTracker(embeddings_dict=embeddings_dict)
+
+    if MODO_LOCAL:
+        logger.info("Modo local activo")
+        cap = cv2.VideoCapture(0) if MODO_LOCAL_CAMARA else cv2.VideoCapture(VIDEO_TEST_PATH)
+        if not cap.isOpened():
+            logger.error("No se pudo abrir la fuente de video local")
+            detener_transmision(transmision)
+            return transmision
+
+        while not transmision["detener_evento"].is_set():
+            ret, frame = cap.read()
+            if not ret:
+                logger.error("No se pudo leer un frame de la cámara")
+                break
+
+            procesado = tracker.process_frame(frame)
+
+            with transmision["lock"]:
+                transmision["frame"] = procesado.copy()
+
+            # Almacenar detecciones en la caché
+            with transmision["detecciones_lock"]:
+                for track_id, (nombre, confianza) in tracker.identified_faces.items():
+                    if nombre != "Desconocido":
+                        if nombre in transmision["detecciones_temporales"]:
+                            if confianza > transmision["detecciones_temporales"][nombre]:
+                                transmision["detecciones_temporales"][nombre] = confianza
+                        else:
+                            transmision["detecciones_temporales"][nombre] = confianza
+
+            # Registrar asistencias periódicamente
+            ahora = time.time()
+            if ahora - transmision["ultimo_registro"] >= INTERVALO_REGISTRO_ASISTENCIA:
+                with transmision["detecciones_lock"]:
+                    if transmision["detecciones_temporales"]:
+                        logger.debug(f"Registrando asistencias para clase {id_clase}: {transmision['detecciones_temporales']}")
+                        for id_estudiante, confianza in transmision["detecciones_temporales"].items():
+                            registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
+                        transmision["detecciones_temporales"].clear()
+                transmision["ultimo_registro"] = ahora
+
+            video_pantalla(cv2, id_clase, procesado)
+
+        logger.info("Bucle de recepción terminado")
+        cap.release()
+
+    else:
+        logger.info("Iniciando recepción de video desde FFmpeg...")
+        cmd = [
+            'ffmpeg',
+            '-protocol_whitelist', 'file,udp,rtp',
+            '-fflags', '+nobuffer+flush_packets',
+            '-flags', '+low_delay',
+            '-analyzeduration', '1',
+            '-probesize', '32',
+            '-i', 'stream.sdp',
+            '-f', 'image2pipe',
+            '-pix_fmt', 'bgr24',
+            '-vsync', '0',
+            '-vcodec', 'rawvideo',
+            '-'
+        ]
+        try:
+            transmision["proceso_ffmpeg"] = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0  # Desactivar el buffering
+            )
+            logger.info("FFmpeg iniciado, PID: %d", transmision["proceso_ffmpeg"].pid)
+            stderr_thread = threading.Thread(
+                target=_log_ffmpeg_stderr,
+                args=(transmision["proceso_ffmpeg"],),
+                daemon=True
+            )
+            stderr_thread.start()
+
+            # Bucle para leer datos de FFmpeg
+            frame_buffer = bytearray()  # Buffer para acumular datos
+            frame_size = width * height * 3  # Tamaño esperado de un frame (921600 bytes)
 
             while not transmision["detener_evento"].is_set():
-                ret, frame = cap.read()
-                if not ret:
-                    logger.error("No se pudo leer un frame de la cámara")
-                    break
-
-                procesado = tracker.process_frame(frame)
-
-                with transmision["lock"]:
-                    transmision["frame"] = procesado.copy()
-
-                # Almacenar detecciones en la caché
-                with transmision["detecciones_lock"]:
-                    for track_id, (nombre, confianza) in tracker.identified_faces.items():
-                        if nombre != "Desconocido":
-                            if nombre in transmision["detecciones_temporales"]:
-                                # Actualizar solo si la nueva confianza es mayor
-                                if confianza > transmision["detecciones_temporales"][nombre]:
-                                    transmision["detecciones_temporales"][nombre] = confianza
-                            else:
-                                transmision["detecciones_temporales"][nombre] = confianza
-                
-                video_pantalla(cv2,id_clase,procesado)
-                
-            logger.info("Bucle de recepción terminado")
-            cap.release()
-
-        else:
-            logger.info("Iniciando recepción de video desde FFmpeg...")
-            cmd = [
-                'ffmpeg',
-                '-protocol_whitelist', 'file,udp,rtp',
-                '-fflags', '+nobuffer+flush_packets',
-                '-flags', '+low_delay',
-                '-analyzeduration', '1',
-                '-probesize', '32',
-                '-i', 'stream.sdp',
-                '-f', 'image2pipe',
-                '-pix_fmt', 'bgr24',
-                '-vsync', '0',
-                '-vcodec', 'rawvideo',
-                '-'
-            ]
-            try:
-                transmision["proceso_ffmpeg"] = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-                logger.info("FFmpeg iniciado, PID: %d", transmision["proceso_ffmpeg"].pid)
-                stderr_thread = threading.Thread(
-                    target=_log_ffmpeg_stderr,
-                    args=(transmision["proceso_ffmpeg"],),
-                    daemon=True
-                )
-                stderr_thread.start()
-
-                while not transmision["detener_evento"].is_set():
-                    raw = transmision["proceso_ffmpeg"].stdout.read(width * height * 3)
-                    if not raw:
+                try:
+                    chunk = transmision["proceso_ffmpeg"].stdout.read(4096)  # Leer en fragmentos de 4096 bytes
+                    if not chunk:
                         logger.debug("No se recibieron datos de FFmpeg")
-                        continue
-                    if len(raw) != width * height * 3:
-                        logger.warning("Datos incompletos de FFmpeg: %d bytes recibidos", len(raw))
+                        time.sleep(0.1)
                         continue
 
-                    frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
-                    frame_procesado = tracker.process_frame(frame)
+                    logger.debug(f"Chunk recibido de FFmpeg: {len(chunk)} bytes")
+                    frame_buffer.extend(chunk)
 
-                    with transmision["lock"]:
-                        transmision["frame"] = frame_procesado.copy()
+                    # Procesar frames completos
+                    while len(frame_buffer) >= frame_size:
+                        raw = frame_buffer[:frame_size]
+                        frame_buffer = frame_buffer[frame_size:]
 
-                    # Almacenar detecciones en la caché
-                    with transmision["detecciones_lock"]:
-                        for track_id, (nombre, confianza) in tracker.identified_faces.items():
-                            if nombre != "Desconocido":
-                                if nombre in transmision["detecciones_temporales"]:
-                                    # Actualizar solo si la nueva confianza es mayor
-                                    if confianza > transmision["detecciones_temporales"][nombre]:
+                        logger.debug("Datos suficientes para un frame, procesando...")
+                        frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
+                        logger.debug(f"Frame creado: shape={frame.shape}, dtype={frame.dtype}")
+
+                        frame_procesado = tracker.process_frame(frame)
+                        logger.debug(f"Frame procesado: {frame_procesado}")
+
+                        if frame_procesado is None or not isinstance(frame_procesado, np.ndarray):
+                            logger.error(f"Frame procesado no válido: {frame_procesado}")
+                            continue
+                        logger.debug(f"Frame procesado válido: shape={frame_procesado.shape}, dtype={frame_procesado.dtype}")
+
+                        with transmision["lock"]:
+                            transmision["frame"] = frame_procesado.copy()
+
+                        # Almacenar detecciones en la caché
+                        with transmision["detecciones_lock"]:
+                            for track_id, (nombre, confianza) in tracker.identified_faces.items():
+                                if nombre != "Desconocido":
+                                    if nombre in transmision["detecciones_temporales"]:
+                                        if confianza > transmision["detecciones_temporales"][nombre]:
+                                            transmision["detecciones_temporales"][nombre] = confianza
+                                    else:
                                         transmision["detecciones_temporales"][nombre] = confianza
-                                else:
-                                    transmision["detecciones_temporales"][nombre] = confianza
-                    #video_pantalla(cv2,id_clase,frame_procesado)                    
 
-            except Exception as e:
-                logger.error(f"No se pudo iniciar FFmpeg: {e}")
-                detener_transmision(id_clase)
-                return
-            finally:
-                detener_transmision(id_clase)
+                        # Registrar asistencias periódicamente
+                        ahora = time.time()
+                        if ahora - transmision["ultimo_registro"] >= INTERVALO_REGISTRO_ASISTENCIA:
+                            with transmision["detecciones_lock"]:
+                                if transmision["detecciones_temporales"]:
+                                    logger.debug(f"Registrando asistencias para clase {id_clase}: {transmision['detecciones_temporales']}")
+                                    for id_estudiante, confianza in transmision["detecciones_temporales"].items():
+                                        registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
+                                    transmision["detecciones_temporales"].clear()
+                            transmision["ultimo_registro"] = ahora
 
-    except Exception as e:
-        logger.error(f"Error en el hilo de recepción para clase {id_clase}: {e}")
-        detener_transmision(id_clase)
+                        # Mostrar el frame procesado en la ventana local
+                        """ 
+                        try:
+                            video_pantalla(cv2, id_clase, frame_procesado)
+                            if cv2.waitKey(1) & 0xFF == ord('q'):
+                                logger.info("Tecla 'q' presionada. Deteniendo la transmisión.")
+                                transmision["detener_evento"].set()
+                        except Exception as e:
+                            logger.error(f"Error al mostrar el frame con cv2.imshow: {e}")
+                            continue
+                        """
+                except Exception as e:
+                    logger.debug(f"Error al leer datos de FFmpeg: {e}")
+                    time.sleep(0.1)
+                    continue
 
-def generar_frames(id_clase):
-    if id_clase not in transmisiones:
-        logger.warning(f"No hay transmisión activa para clase {id_clase}")
-        return
+        except Exception as e:
+            logger.error(f"No se pudo iniciar FFmpeg: {e}")
+            detener_transmision(transmision)
+            return transmision
+        finally:
+            detener_transmision(transmision)
 
-    transmision = transmisiones[id_clase]
-    logger.info(f"Cliente conectado, generando frames para clase {id_clase}...")
+    return transmision
+
+def generar_frames(transmision):
+    logger.info(f"Cliente conectado, generando frames para clase {transmision['id_clase']}...")
     while True:
         with transmision["lock"]:
             if transmision["frame"] is None:
+                logger.debug("No hay frame disponible para enviar al frontend")
+                time.sleep(0.04)
                 continue
+            logger.debug(f"Enviando frame al frontend: shape={transmision['frame'].shape}")
             ret, buffer = cv2.imencode('.jpg', transmision["frame"])
+            if not ret:
+                logger.error("No se pudo codificar el frame en JPEG")
+                time.sleep(0.04)
+                continue
             frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         time.sleep(0.04)
 
-def video_pantalla(cv2,id_clase,frame_procesado):
-    # Mostrar el frame procesado en una ventana
+def video_pantalla(cv2, id_clase, frame_procesado):
     cv2.imshow(f"Vista previa - {id_clase}", frame_procesado)
-
-    # Permite cerrar la ventana con 'q'
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        logger.info("Tecla 'q' presionada. Saliendo del bucle de recepción.")
