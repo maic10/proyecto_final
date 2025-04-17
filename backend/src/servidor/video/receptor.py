@@ -25,8 +25,9 @@ def _log_ffmpeg_stderr(process):
         stderr_line = process.stderr.readline().decode().strip()
         if not stderr_line and process.poll() is not None:
             break
-        if stderr_line:
-            logger.debug(f"[FFMPEG] {stderr_line}")
+        # Revisar los bugs
+        #if stderr_line:
+            #logger.debug(f"[FFMPEG] {stderr_line}")
 
 def detener_transmision(transmision_or_id_clase):
     logger.info(f"Deteniendo transmisión maic1020")
@@ -140,18 +141,16 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
             stderr_thread.start()
 
             # Bucle para leer datos de FFmpeg
-            frame_buffer = bytearray()  # Buffer para acumular datos
             frame_size = width * height * 3  # Tamaño esperado de un frame (921600 bytes)
+            chunk_size = 65536  # Leer fragmentos de 64 KB para reducir iteraciones
+            frame_buffer = bytearray()  # Buffer para acumular datos
 
             while not transmision["detener_evento"].is_set():
                 try:
-                    chunk = transmision["proceso_ffmpeg"].stdout.read(4096)  # Leer en fragmentos de 4096 bytes
+                    chunk = transmision["proceso_ffmpeg"].stdout.read(chunk_size)
                     if not chunk:
                         logger.debug("No se recibieron datos de FFmpeg")
-                        time.sleep(0.1)
                         continue
-
-                    logger.debug(f"Chunk recibido de FFmpeg: {len(chunk)} bytes")
                     frame_buffer.extend(chunk)
 
                     # Procesar frames completos
@@ -159,17 +158,13 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
                         raw = frame_buffer[:frame_size]
                         frame_buffer = frame_buffer[frame_size:]
 
-                        logger.debug("Datos suficientes para un frame, procesando...")
                         frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
-                        logger.debug(f"Frame creado: shape={frame.shape}, dtype={frame.dtype}")
 
                         frame_procesado = tracker.process_frame(frame)
-                        logger.debug(f"Frame procesado: {frame_procesado}")
 
                         if frame_procesado is None or not isinstance(frame_procesado, np.ndarray):
-                            logger.error(f"Frame procesado no válido: {frame_procesado}")
-                            continue
-                        logger.debug(f"Frame procesado válido: shape={frame_procesado.shape}, dtype={frame_procesado.dtype}")
+                            #logger.error(f"Frame procesado no válido: {frame_procesado}")
+                            continue                    
 
                         with transmision["lock"]:
                             transmision["frame"] = frame_procesado.copy()
@@ -195,8 +190,8 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
                                     transmision["detecciones_temporales"].clear()
                             transmision["ultimo_registro"] = ahora
 
-                        # Mostrar el frame procesado en la ventana local
-                        """ 
+                        # Mostrar el frame procesado en la ventana local (descomentar si es necesario)
+                        """
                         try:
                             video_pantalla(cv2, id_clase, frame_procesado)
                             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -206,9 +201,9 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
                             logger.error(f"Error al mostrar el frame con cv2.imshow: {e}")
                             continue
                         """
+
                 except Exception as e:
                     logger.debug(f"Error al leer datos de FFmpeg: {e}")
-                    time.sleep(0.1)
                     continue
 
         except Exception as e:
@@ -225,13 +220,13 @@ def generar_frames(transmision):
     while True:
         with transmision["lock"]:
             if transmision["frame"] is None:
-                logger.debug("No hay frame disponible para enviar al frontend")
+                #logger.debug("No hay frame disponible para enviar al frontend")
                 time.sleep(0.04)
                 continue
-            logger.debug(f"Enviando frame al frontend: shape={transmision['frame'].shape}")
+            #logger.debug(f"Enviando frame al frontend: shape={transmision['frame'].shape}")
             ret, buffer = cv2.imencode('.jpg', transmision["frame"])
             if not ret:
-                logger.error("No se pudo codificar el frame en JPEG")
+                #logger.error("No se pudo codificar el frame en JPEG")
                 time.sleep(0.04)
                 continue
             frame_bytes = buffer.tobytes()

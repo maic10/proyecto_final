@@ -150,32 +150,37 @@ class EstadoTransmision(Resource):
 
         if active_clase and (not id_clase or id_clase != active_clase):
             # Hay una transmisión activa, pero no corresponde a una clase activa ahora
-            thread = transmisiones_activas[active_clase]["thread"]
+            if active_clase not in transmisiones_activas:
+                logger.debug(f"Transmisión para clase {active_clase} ya ha sido detenida")
+                return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
+
             transmision = transmisiones_activas[active_clase]["transmision"]
-            # Añadir un timeout para evitar bloqueos
-            """
-            thread.join(timeout=10.0)
-            if thread.is_alive():
-                logger.warning(f"El hilo de transmisión para clase {active_clase} no terminó dentro del timeout. Forzando detención.")
-                transmision["detener_evento"].set()
-                if transmision.get("proceso_ffmpeg"):
-                    transmision["proceso_ffmpeg"].terminate()
-                    transmision["proceso_ffmpeg"].wait()
-            """
-            detener_transmision(transmision)
+            if transmision["detener_evento"].is_set():
+                logger.debug(f"Transmisión para clase {active_clase} ya está detenida")
+            else:
+                detener_transmision(transmision)
+
             rpi_data = transmisiones_activas.get(active_clase, {})
             if rpi_data and rpi_data["id_rpi"] == id_rpi:
                 try:
                     token = request.headers.get("Authorization").split(" ")[1]
-                    headers = {"Authorization": f"Bearer {token}"}
-                    requests.post(
+                    logger.info(f"Token de autorización: {token}")
+                    headers = {
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json"
+                    }
+                    response = requests.post(
                         f"http://{rpi_data['ip']}:{rpi_data['port']}/stop_transmission",
                         headers=headers,
+                        json={},
                         timeout=5
                     )
+                    response.raise_for_status()
                     logger.info(f"Notificación de parada enviada a {rpi_data['ip']}:{rpi_data['port']}")
                 except requests.RequestException as e:
                     logger.error(f"Error al notificar a RPI {id_rpi}: {e}")
+
+            # Eliminar la transmisión de transmisiones_activas
             transmisiones_activas.pop(active_clase, None)
             logger.info(f"Clase {active_clase} finalizada o no activa para RPI {id_rpi}")
             return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200

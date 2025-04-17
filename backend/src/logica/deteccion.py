@@ -118,12 +118,12 @@ class FaceTracker:
                     if best_similarity > self.similarity_threshold:
                         best_match_id = self.all_ids[best_idx]
                         new_identified[track_id] = (best_match_id, best_similarity)
-                        if self.verbose:
-                            logger.info(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
+                        #if self.verbose:
+                        #    logger.info(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
                     else:
                         new_identified[track_id] = ("Desconocido", best_similarity)
-                        if self.verbose:
-                            logger.info(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
+                        #if self.verbose:
+                        #    logger.info(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
 
         # Actualizar solo tracks nuevos o "Desconocido"
         for track_id, identity in new_identified.items():
@@ -137,9 +137,9 @@ class FaceTracker:
         # Limpieza si no hay detecciones
         if not faces:
             self.identified_faces.clear()
-            logger.debug("No hay rostros detectados, limpiando tracks.")
+            #logger.debug("No hay rostros detectados, limpiando tracks.")
 
-        logger.debug(f"Identidades activas: {self.identified_faces}")
+        #logger.debug(f"Identidades activas: {self.identified_faces}")
         return self.identified_faces
 
     def process_frame(self, frame):
