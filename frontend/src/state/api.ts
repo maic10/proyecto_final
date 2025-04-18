@@ -128,10 +128,23 @@ export async function obtenerAsistenciasActual(idClase: string, fecha: string) {
   return res;
 }
 
-export async function actualizarEstadoAsistencia(idEstudiante: string, idClase: string, fecha: string, estado: string) {
-  const res = await axiosInstance.put(`/asistencias/${idEstudiante}`, { id_clase: idClase, fecha, estado });
-  return res;
-}
+export const actualizarEstadoAsistencia = async (
+  idEstudiante: string,
+  idClase: string,
+  fecha: string,
+  nuevoEstado: string
+): Promise<void> => {
+  const usuario = obtenerUsuario();
+  const fechaModificacion = new Date().toISOString();
+
+  await axiosInstance.put(`/asistencias/${idEstudiante}`, {
+    id_clase: idClase,
+    fecha,
+    estado: nuevoEstado,
+    modificado_por_usuario: usuario?.id_usuario || 'desconocido',
+    modificado_fecha: fechaModificacion,
+  });
+};
 
 export async function verificarEstadoTransmision(idClase: string) {
   const params = { id_clase: idClase };
@@ -283,6 +296,12 @@ export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<
   return await obtenerClasesAdmin(asignaturaId, undefined, undefined);
 };
 
+export const ajustarTiempoMaximo = async (idClase: string, tiempoMaximo: number) => {
+  const response = await axiosInstance.post(`/transmision/tiempo_maximo/${idClase}`, {
+    tiempo_maximo: tiempoMaximo,
+  });
+  return response.data;
+};
 
 //export async function obtenerStreamVideo(idClase: string) {
 //  const res = await axiosInstance.get(`/transmision/video/${idClase}`, {

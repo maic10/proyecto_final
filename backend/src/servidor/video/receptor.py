@@ -13,10 +13,11 @@ from src.logica.utils import (
 )
 
 # Constantes de configuración
-MODO_LOCAL = True
+MODO_LOCAL = False
 MODO_LOCAL_CAMARA = False
 VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
 INTERVALO_REGISTRO_ASISTENCIA = 10  # Intervalo para registrar asistencias (segundos)
+TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos en segundos
 
 def _log_ffmpeg_stderr(process):
     """Registra los mensajes de error de FFmpeg en un hilo separado."""
@@ -49,7 +50,13 @@ def detener_transmision(transmision_or_id_aula):
     # Registrar las detecciones pendientes antes de detener
     with transmision["detecciones_lock"]:
         for id_estudiante, confianza in transmision["detecciones_temporales"].items():
-            registrar_asistencia_en_db(transmision["id_clase"], id_estudiante, confianza)
+            registrar_asistencia_en_db(
+                transmision["id_clase"],
+                id_estudiante,
+                confianza,
+                transmision["tiempo_inicio"],
+                transmision["tiempo_maximo_deteccion"]
+            )
         transmision["detecciones_temporales"].clear()
     if transmision.get("proceso_ffmpeg"):
         transmision["proceso_ffmpeg"].terminate()
@@ -111,10 +118,14 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
             if ahora - transmision["ultimo_registro"] >= INTERVALO_REGISTRO_ASISTENCIA:
                 with transmision["detecciones_lock"]:
                     if transmision["detecciones_temporales"]:
-                        # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                        # logger.debug(f"Registrando asistencias para clase {id_clase}: {transmision['detecciones_temporales']}")
                         for id_estudiante, confianza in transmision["detecciones_temporales"].items():
-                            registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
+                            registrar_asistencia_en_db(
+                                id_clase,
+                                id_estudiante,
+                                confianza,
+                                transmision["tiempo_inicio"],
+                                transmision["tiempo_maximo_deteccion"]
+                            )
                         transmision["detecciones_temporales"].clear()
                 transmision["ultimo_registro"] = ahora
 
@@ -204,10 +215,14 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
                         if ahora - transmision["ultimo_registro"] >= INTERVALO_REGISTRO_ASISTENCIA:
                             with transmision["detecciones_lock"]:
                                 if transmision["detecciones_temporales"]:
-                                    # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                                    # logger.debug(f"Registrando asistencias para clase {id_clase}: {transmision['detecciones_temporales']}")
                                     for id_estudiante, confianza in transmision["detecciones_temporales"].items():
-                                        registrar_asistencia_en_db(id_clase, id_estudiante, confianza)
+                                        registrar_asistencia_en_db(
+                                            id_clase,
+                                            id_estudiante,
+                                            confianza,
+                                            transmision["tiempo_inicio"],
+                                            transmision["tiempo_maximo_deteccion"]
+                                        )
                                     transmision["detecciones_temporales"].clear()
                             transmision["ultimo_registro"] = ahora
 

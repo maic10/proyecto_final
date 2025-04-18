@@ -3,6 +3,7 @@ from datetime import datetime
 import pytz
 from .logger import logger
 from src.logica.database import *
+import time 
 
 # Mapeo de días en inglés a español
 DIAS_EN_ESPANOL = {
@@ -37,51 +38,116 @@ def cargar_embeddings_por_clase(id_clase):
     return embeddings_dict
 
 
-def registrar_asistencia_en_db(id_clase, id_estudiante, confianza):
+def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio, tiempo_maximo_deteccion):
     """
-    Registra o actualiza la asistencia en MongoDB.
-    :param id_clase: ID de la clase
-    :param id_estudiante: ID del estudiante
-    :param confianza: Nivel de similitud
+    Registra o actualiza la asistencia en MongoDB, determinando si es a tiempo o tardía.
+
+    Args:
+        id_clase (str): ID de la clase.
+        id_estudiante (str): ID del estudiante.
+        confianza (float): Nivel de similitud de la detección.
+        tiempo_inicio (float): Tiempo de inicio de la transmisión (timestamp).
+        tiempo_maximo_deteccion (float): Tiempo máximo para considerar una detección a tiempo (en segundos).
     """
-    fecha_actual = datetime.now().strftime("%Y-%m-%d")
-    doc = get_asistencia(id_clase, fecha_actual)  # Corregido: Usar get_asistencia
-    if not doc:
-        logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha_actual}")
-        return
+    from src.servidor.api import mongo
+    try:
+        # Obtener la fecha y hora actual en la zona horaria deseada
+        now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
+        zona_horaria = pytz.timezone("Europe/Madrid")
+        now = now_utc.astimezone(zona_horaria)
+        fecha_actual = now.strftime("%Y-%m-%d")
+        fecha_deteccion = now.isoformat()
 
-    registros = doc["registros"]
-    estudiante_encontrado = None
-    for registro in registros:
-        if registro["id_estudiante"] == id_estudiante:
-            estudiante_encontrado = registro
-            break
+        # Determinar si la detección es a tiempo o tardía
+        tiempo_transcurrido = time.time() - tiempo_inicio
+        es_tardia = tiempo_transcurrido >= tiempo_maximo_deteccion
 
-    if estudiante_encontrado:
-        # Si el estudiante ya está registrado como "confirmado", actualizar solo si la confianza es mayor
-        if estudiante_encontrado["estado"] == "confirmado":
-            if confianza > estudiante_encontrado["confianza"]:
-                estudiante_encontrado["confianza"] = confianza
-                estudiante_encontrado["fecha_deteccion"] = datetime.utcnow().isoformat() + "Z"
+        # Obtener el documento de asistencia
+        doc = mongo.db.asistencias.find_one({
+            "id_clase": id_clase,
+            "fecha": fecha_actual
+        })
+        if not doc:
+            logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha_actual}")
+            return
+
+        registros = doc["registros"]
+        estudiante_encontrado = None
+        for registro in registros:
+            if registro["id_estudiante"] == id_estudiante:
+                estudiante_encontrado = registro
+                break
+
+        if not estudiante_encontrado:
+            logger.warning(f"Estudiante {id_estudiante} no encontrado en registros de clase {id_clase}")
+            return
+
+        # Preparar los campos a actualizar
+        update_fields = {}
+
+        # Si el estudiante ya tiene una detección (estado "confirmado" o "tarde")
+        if estudiante_encontrado["estado"] in ["confirmado", "tarde"]:
+            # Manejar el caso en que confianza sea None (por ejemplo, registro creado manualmente)
+            confianza_existente = estudiante_encontrado["confianza"]
+            if confianza_existente is None or confianza > confianza_existente:
+                update_fields["confianza"] = confianza
+                if es_tardia:
+                    # Si es tardía, actualizar fecha_deteccion_tardia
+                    update_fields["fecha_deteccion_tardia"] = fecha_deteccion
+                else:
+                    # Si es a tiempo, actualizar fecha_deteccion
+                    update_fields["fecha_deteccion"] = fecha_deteccion
+
+            # Siempre registrar fecha_deteccion_tardia si es tardía, incluso si no se actualiza confianza
+            if es_tardia and "fecha_deteccion_tardia" not in update_fields:
+                update_fields["fecha_deteccion_tardia"] = fecha_deteccion
+
+            if update_fields:
+                mongo.db.asistencias.update_one(
+                    {"id_clase": id_clase, "fecha": fecha_actual, "registros.id_estudiante": id_estudiante},
+                    {
+                        "$set": {
+                            "registros.$.confianza": update_fields.get("confianza", estudiante_encontrado["confianza"]),
+                            "registros.$.fecha_deteccion": update_fields.get("fecha_deteccion", estudiante_encontrado["fecha_deteccion"]),
+                            "registros.$.fecha_deteccion_tardia": update_fields.get("fecha_deteccion_tardia", estudiante_encontrado.get("fecha_deteccion_tardia"))
+                        }
+                    }
+                )
                 logger.info(f"Actualizando asistencia de estudiante {id_estudiante} con confianza {confianza:.2f} para clase {id_clase}")
-                update_asistencia(id_clase, fecha_actual, registros)
             else:
                 logger.debug(f"Estudiante {id_estudiante} ya registrado con confianza mayor ({estudiante_encontrado['confianza']:.2f} > {confianza:.2f})")
             return
-    else:
-        # Si el estudiante no está en los registros, debería estarlo (fue inicializado como "ausente")
-        logger.warning(f"Estudiante {id_estudiante} no encontrado en registros de clase {id_clase}")
-        return
 
-    # Actualizar el estado a "confirmado" si no estaba confirmado
-    estudiante_encontrado["estado"] = "confirmado"
-    estudiante_encontrado["confianza"] = confianza
-    estudiante_encontrado["fecha_deteccion"] = datetime.utcnow().isoformat() + "Z"
-    estudiante_encontrado["modificado_por_usuario"] = None
-    estudiante_encontrado["modificado_fecha"] = None
+        # Si el estudiante no tiene una detección previa (estado "ausente")
+        update_fields = {
+            "estado": "confirmado" if not es_tardia else "tarde",
+            "confianza": confianza,
+            "modificado_por_usuario": None,
+            "modificado_fecha": None
+        }
+        if es_tardia:
+            update_fields["fecha_deteccion"] = None
+            update_fields["fecha_deteccion_tardia"] = fecha_deteccion
+        else:
+            update_fields["fecha_deteccion"] = fecha_deteccion
+            update_fields["fecha_deteccion_tardia"] = None
 
-    update_asistencia(id_clase, fecha_actual, registros)
-    logger.info(f"Estudiante {id_estudiante} registrado con confianza {confianza:.2f} para clase {id_clase}")
+        mongo.db.asistencias.update_one(
+            {"id_clase": id_clase, "fecha": fecha_actual, "registros.id_estudiante": id_estudiante},
+            {
+                "$set": {
+                    "registros.$.estado": update_fields["estado"],
+                    "registros.$.confianza": update_fields["confianza"],
+                    "registros.$.fecha_deteccion": update_fields["fecha_deteccion"],
+                    "registros.$.fecha_deteccion_tardia": update_fields["fecha_deteccion_tardia"],
+                    "registros.$.modificado_por_usuario": None,
+                    "registros.$.modificado_fecha": None
+                }
+            }
+        )
+        logger.info(f"Estudiante {id_estudiante} registrado como {update_fields['estado']} con confianza {confianza:.2f} para clase {id_clase}")
+    except Exception as e:
+        logger.error(f"Error al registrar asistencia para estudiante {id_estudiante} en clase {id_clase}: {e}")
     
 """"
 "" /transmision/iniciar"

@@ -97,7 +97,7 @@ class FaceTracker:
         if not self.embeddings_dict or not faces or len(tracked_objects) == 0:
             if not faces:
                 self.identified_faces.clear()
-                logger.debug("No hay rostros detectados, limpiando tracks.")
+                #logger.debug("No hay rostros detectados, limpiando tracks.")
             return self.identified_faces
 
         # Extraer embeddings de rostros detectados

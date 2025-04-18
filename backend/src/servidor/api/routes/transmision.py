@@ -20,6 +20,10 @@ import pytz
 
 transmisiones_activas = {}  # {id_aula: {"thread": threading.Thread, "id_rpi": str, "ip": str, "port": int, "id_clase": str, "transmision": dict}}
 
+# Constantes
+TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos en segundos
+TIEMPO_LIMITE_AJUSTE = 5 * 60  # 5 minutos en segundos para permitir ajustes
+
 def tarea_en_hilo(func, *args):
     """Ejecuta una función en un hilo separado."""
     thread = threading.Thread(target=func, args=args, daemon=True)
@@ -85,7 +89,7 @@ class IniciarTransmision(Resource):
                 "mensaje": "Transmisión actualizada para nueva clase."
             }, 200
 
-        # Crear el objeto transmision
+        # Crear el objeto transmision con tiempo de inicio y tiempo máximo
         transmision = {
             "id_clase": id_clase,
             "frame": None,
@@ -94,7 +98,9 @@ class IniciarTransmision(Resource):
             "proceso_ffmpeg": None,
             "detecciones_temporales": {},
             "detecciones_lock": threading.Lock(),
-            "ultimo_registro": time.time()
+            "ultimo_registro": time.time(),
+            "tiempo_inicio": time.time(),  # Registrar el tiempo de inicio
+            "tiempo_maximo_deteccion": TIEMPO_MAXIMO_DETECCION_DEFAULT  # Tiempo máximo configurable
         }
 
         # Iniciar transmisión en un hilo
@@ -226,3 +232,103 @@ class VideoStreamRoute(Resource):
             generar_frames(transmisiones_activas[id_aula]["transmision"]),
             mimetype='multipart/x-mixed-replace; boundary=frame'
         )
+
+@ns.route("/transmision/tiempo_maximo/<string:id_clase>")
+class AjustarTiempoMaximo(Resource):
+    @jwt_required()
+    def post(self, id_clase):
+        """Permite al profesor ajustar el tiempo máximo para detecciones a tiempo."""
+        data = request.get_json()
+        if not data or "tiempo_maximo" not in data:
+            logger.error("Falta 'tiempo_maximo' en el cuerpo JSON")
+            return {"error": "Falta 'tiempo_maximo' en el cuerpo JSON"}, 400
+
+        # Convertir tiempo_maximo a float
+        try:
+            logger.debug(f"Valor recibido para tiempo_maximo: {data['tiempo_maximo']} (tipo: {type(data['tiempo_maximo'])})")
+            tiempo_maximo = float(data["tiempo_maximo"])
+        except (ValueError, TypeError) as e:
+            logger.error(f"Tiempo máximo no es un número válido: {data['tiempo_maximo']} (tipo: {type(data['tiempo_maximo'])}), error: {e}")
+            return {"error": "El tiempo máximo debe ser un número válido"}, 422
+
+        if tiempo_maximo <= 0:
+            logger.error(f"Tiempo máximo inválido (debe ser positivo): {tiempo_maximo}")
+            return {"error": "El tiempo máximo debe ser un número positivo"}, 422
+
+        id_aula = obtener_aula_por_clase(id_clase)
+        if not id_aula:
+            logger.warning(f"No se encontró aula activa para clase {id_clase}")
+            return {"error": "No hay aula asociada para esta clase"}, 404
+
+        if not es_transmision_activa(id_aula):
+            logger.warning(f"No hay transmisión activa para aula {id_aula}")
+            return {"error": "No hay transmisión activa para esta aula"}, 503
+
+        # Verificar si han pasado más de 5 minutos desde el inicio de la transmisión
+        transmision = transmisiones_activas[id_aula]["transmision"]
+        tiempo_inicio = transmision["tiempo_inicio"]
+        tiempo_transcurrido = time.time() - tiempo_inicio
+
+        if tiempo_transcurrido > TIEMPO_LIMITE_AJUSTE:
+            logger.warning(f"No se puede ajustar el tiempo máximo después de {TIEMPO_LIMITE_AJUSTE/60} minutos")
+            return {"error": "El tiempo máximo solo puede ajustarse en los primeros 5 minutos de la clase"}, 403
+
+        # Ajustar el tiempo máximo (en segundos)
+        transmision["tiempo_maximo_deteccion"] = tiempo_maximo * 60
+        logger.info(f"Tiempo máximo ajustado a {tiempo_maximo} minutos para clase {id_clase}")
+        return {"mensaje": f"Tiempo máximo ajustado a {tiempo_maximo} minutos"}, 200
+    
+@ns.route("/asistencias/<string:id_estudiante>")
+class ActualizarAsistencia(Resource):
+    @jwt_required()
+    def put(self, id_estudiante):
+        """Actualiza el estado de una asistencia."""
+        data = request.get_json()
+        if not data or "id_clase" not in data or "fecha" not in data or "estado" not in data:
+            logger.error("Faltan parámetros requeridos en el cuerpo JSON")
+            return {"error": "Faltan parámetros requeridos (id_clase, fecha, estado)"}, 400
+
+        id_clase = data["id_clase"]
+        fecha = data["fecha"]
+        nuevo_estado = data["estado"]
+        modificado_por_usuario = data.get("modificado_por_usuario", "desconocido")
+        modificado_fecha = data.get("modificado_fecha", datetime.utcnow().isoformat() + "Z")
+
+        if nuevo_estado not in ["confirmado", "tarde", "ausente"]:
+            logger.error(f"Estado inválido: {nuevo_estado}")
+            return {"error": "Estado inválido"}, 400
+
+        # Buscar el documento de asistencia
+        doc = mongo.db.asistencias.find_one({
+            "id_clase": id_clase,
+            "fecha": fecha
+        })
+        if not doc:
+            logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha}")
+            return {"error": "Asistencia no encontrada"}, 404
+
+        # Buscar el registro del estudiante
+        registros = doc["registros"]
+        estudiante_encontrado = None
+        for registro in registros:
+            if registro["id_estudiante"] == id_estudiante:
+                estudiante_encontrado = registro
+                break
+
+        if not estudiante_encontrado:
+            logger.warning(f"Estudiante {id_estudiante} no encontrado en registros de clase {id_clase}")
+            return {"error": "Estudiante no encontrado en la asistencia"}, 404
+
+        # Actualizar el registro
+        mongo.db.asistencias.update_one(
+            {"id_clase": id_clase, "fecha": fecha, "registros.id_estudiante": id_estudiante},
+            {
+                "$set": {
+                    "registros.$.estado": nuevo_estado,
+                    "registros.$.modificado_por_usuario": modificado_por_usuario,
+                    "registros.$.modificado_fecha": modificado_fecha
+                }
+            }
+        )
+        logger.info(f"Estado de asistencia actualizado para estudiante {id_estudiante} en clase {id_clase}: {nuevo_estado}")
+        return {"mensaje": "Estado actualizado exitosamente"}, 200
