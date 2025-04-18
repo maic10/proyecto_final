@@ -17,7 +17,7 @@ from src.servidor.api.auth_raspberry import raspberry_token_required
 import requests
 import pytz
 
-transmisiones_activas = {}  # {id_clase: {"thread": threading.Thread, "id_rpi": str, "ip": str, "port": int, "id_aula": str, "transmision": dict}}
+transmisiones_activas = {}  # {id_aula: {"thread": threading.Thread, "id_rpi": str, "ip": str, "port": int, "id_clase": str, "transmision": dict}}
 
 def tarea_en_hilo(func, *args):
     """Ejecuta una función en un hilo separado."""
@@ -25,15 +25,14 @@ def tarea_en_hilo(func, *args):
     thread.start()
     return thread
 
-def es_transmision_activa(id_clase):
-    """Verifica si hay una transmisión activa para una clase específica."""
-    if id_clase in transmisiones_activas:
-        transmision = transmisiones_activas[id_clase]["transmision"]
-        thread = transmisiones_activas[id_clase]["thread"]
+def es_transmision_activa(id_aula):
+    """Verifica si hay una transmisión activa para un aula específica."""
+    if id_aula in transmisiones_activas:
+        transmision = transmisiones_activas[id_aula]["transmision"]
+        thread = transmisiones_activas[id_aula]["thread"]
         if not transmision["detener_evento"].is_set() and thread.is_alive():
             return True
-        # Si el hilo ha terminado o la transmisión se detuvo, limpiar la entrada
-        transmisiones_activas.pop(id_clase, None)
+        transmisiones_activas.pop(id_aula, None)
     return False
 
 @ns.route("/transmision/iniciar")
@@ -75,9 +74,15 @@ class IniciarTransmision(Resource):
         hoy = now.strftime("%Y-%m-%d")
         crear_asistencia_si_no_existe(id_clase, hoy, id_aula)
 
-        if id_clase in transmisiones_activas:
-            logger.warning(f"Transmisión ya activa para clase {id_clase}")
-            return {"permitido": False, "motivo": "Transmisión ya activa"}, 400
+        if id_aula in transmisiones_activas:
+            # Actualizar la clase activa si ya hay una transmisión para el aula
+            transmisiones_activas[id_aula]["id_clase"] = id_clase
+            logger.info(f"Transmisión actualizada para aula {id_aula} con clase {id_clase}")
+            return {
+                "permitido": True,
+                "id_clase": id_clase,
+                "mensaje": "Transmisión actualizada para nueva clase."
+            }, 200
 
         # Crear el objeto transmision
         transmision = {
@@ -94,24 +99,24 @@ class IniciarTransmision(Resource):
         # Iniciar transmisión en un hilo
         def iniciar_transmision_hilo(transmision):
             try:
-                iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
+                iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, transmision)
             except Exception as e:
-                logger.error(f"Error en transmisión para clase {id_clase}: {e}")
+                logger.error(f"Error en transmisión para aula {id_aula}: {e}")
                 detener_transmision(transmision)
-                transmisiones_activas.pop(id_clase, None)
+                transmisiones_activas.pop(id_aula, None)
 
         thread = tarea_en_hilo(iniciar_transmision_hilo, transmision)
 
-        transmisiones_activas[id_clase] = {
+        transmisiones_activas[id_aula] = {
             "thread": thread,
             "id_rpi": id_rpi,
             "ip": ip_rpi,
             "port": port_rpi,
-            "id_aula": id_aula,
+            "id_clase": id_clase,
             "transmision": transmision
         }
 
-        logger.info(f"Transmisión aprobada para clase {id_clase} desde RPI {id_rpi}")
+        logger.info(f"Transmisión iniciada para aula {id_aula} con clase {id_clase}")
         return {
             "permitido": True,
             "id_clase": id_clase,
@@ -140,48 +145,43 @@ class EstadoTransmision(Resource):
 
         id_clase = obtener_clase_activa_para_aula(id_aula, detener=True)
 
-        active_clase = None
-        for clase, data in list(transmisiones_activas.items()):
-            if data["id_rpi"] == id_rpi:
-                active_clase = clase
-                break
+        if id_aula in transmisiones_activas:
+            active_clase = transmisiones_activas[id_aula]["id_clase"]
+            if not id_clase or id_clase != active_clase:
+                if id_aula not in transmisiones_activas:
+                    logger.debug(f"Transmisión para aula {id_aula} ya ha sido detenida")
+                    return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
 
-        if active_clase and (not id_clase or id_clase != active_clase):
-            if active_clase not in transmisiones_activas:
-                logger.debug(f"Transmisión para clase {active_clase} ya ha sido detenida")
+                transmision = transmisiones_activas[id_aula]["transmision"]
+                if transmision["detener_evento"].is_set():
+                    logger.debug(f"Transmisión para aula {id_aula} ya está detenida")
+                else:
+                    detener_transmision(transmision)
+
+                rpi_data = transmisiones_activas.get(id_aula, {})
+                if rpi_data and rpi_data["id_rpi"] == id_rpi:
+                    try:
+                        token = request.headers.get("Authorization").split(" ")[1]
+                        headers = {
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json"
+                        }
+                        response = requests.post(
+                            f"http://{rpi_data['ip']}:{rpi_data['port']}/stop_transmission",
+                            headers=headers,
+                            json={},
+                            timeout=5
+                        )
+                        response.raise_for_status()
+                        logger.info(f"Notificación de parada enviada a {rpi_data['ip']}:{rpi_data['port']}")
+                    except requests.RequestException as e:
+                        logger.error(f"Error al notificar a RPI {id_rpi}: {e}")
+
+                transmisiones_activas.pop(id_aula, None)
+                logger.info(f"Clase {active_clase} finalizada o no activa para RPI {id_rpi}")
                 return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
 
-            transmision = transmisiones_activas[active_clase]["transmision"]
-            if transmision["detener_evento"].is_set():
-                logger.debug(f"Transmisión para clase {active_clase} ya está detenida")
-            else:
-                detener_transmision(transmision)
-
-            rpi_data = transmisiones_activas.get(active_clase, {})
-            if rpi_data and rpi_data["id_rpi"] == id_rpi:
-                try:
-                    token = request.headers.get("Authorization").split(" ")[1]
-                    headers = {
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json"
-                    }
-                    response = requests.post(
-                        f"http://{rpi_data['ip']}:{rpi_data['port']}/stop_transmission",
-                        headers=headers,
-                        json={},
-                        timeout=5
-                    )
-                    response.raise_for_status()
-                    logger.info(f"Notificación de parada enviada a {rpi_data['ip']}:{rpi_data['port']}")
-                except requests.RequestException as e:
-                    logger.error(f"Error al notificar a RPI {id_rpi}: {e}")
-
-            transmisiones_activas.pop(active_clase, None)
-            logger.info(f"Clase {active_clase} finalizada o no activa para RPI {id_rpi}")
-            return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
-
-        if id_clase and id_clase in transmisiones_activas:
-            logger.info(f"Transmisión en curso para clase {id_clase} y RPI {id_rpi}")
+            logger.info(f"Transmisión en curso para aula {id_aula} con clase {id_clase}")
             return {"transmitir": True, "id_clase": id_clase}, 200
 
         logger.info(f"Clase {id_clase} finalizada o no activa para RPI {id_rpi}")
@@ -190,28 +190,28 @@ class EstadoTransmision(Resource):
 @ns.route("/estado_web")
 class EstadoTransmisionWeb(Resource):
     @jwt_required()
-    @ns.doc(params={"id_clase": "ID de la clase"})
+    @ns.doc(params={"id_aula": "ID del aula"})
     def get(self):
-        """Verifica si hay una transmisión activa para una clase (para el frontend)."""
+        """Verifica si hay una transmisión activa para un aula (para el frontend)."""
         parser = reqparse.RequestParser()
-        parser.add_argument("id_clase", type=str, required=True)
+        parser.add_argument("id_aula", type=str, required=True)
         args = parser.parse_args()
 
-        id_clase = args["id_clase"]
-        transmitir = es_transmision_activa(id_clase)
+        id_aula = args["id_aula"]
+        transmitir = es_transmision_activa(id_aula)
         return {"transmitir": transmitir}, 200
 
-@ns.route("/transmision/video/<string:id_clase>")
+@ns.route("/transmision/video/<string:id_aula>")
 class VideoStreamRoute(Resource):
-    #@jwt_required()  # Reactivar la autenticación JWT para el frontend
-    def get(self, id_clase):
-        """Genera un stream de video para la clase especificada."""
-        if not es_transmision_activa(id_clase):
-            logger.warning(f"No hay transmisión activa para clase {id_clase}")
-            return {"error": "No hay transmisión activa para esta clase"}, 503
+    @jwt_required()
+    def get(self, id_aula):
+        """Genera un stream de video para el aula especificada."""
+        if not es_transmision_activa(id_aula):
+            logger.warning(f"No hay transmisión activa para aula {id_aula}")
+            return {"error": "No hay transmisión activa para esta aula"}, 503
         
-        logger.info(f"Generando stream de video para clase {id_clase}")
+        logger.info(f"Generando stream de video para aula {id_aula}")
         return Response(
-            generar_frames(transmisiones_activas[id_clase]["transmision"]),
+            generar_frames(transmisiones_activas[id_aula]["transmision"]),
             mimetype='multipart/x-mixed-replace; boundary=frame'
         )

@@ -13,7 +13,7 @@ from src.logica.utils import (
 )
 
 # Constantes de configuración
-MODO_LOCAL = False
+MODO_LOCAL = True
 MODO_LOCAL_CAMARA = False
 VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
 INTERVALO_REGISTRO_ASISTENCIA = 10  # Intervalo para registrar asistencias (segundos)
@@ -28,23 +28,23 @@ def _log_ffmpeg_stderr(process):
         # if stderr_line:
         #     logger.debug(f"[FFMPEG] {stderr_line}")
 
-def detener_transmision(transmision_or_id_clase):
-    """Detiene la transmisión para una clase específica o un objeto de transmisión."""
-    if isinstance(transmision_or_id_clase, str):  # Si es un ID de clase
-        id_clase = transmision_or_id_clase
-        if id_clase not in transmisiones_activas:
-            logger.warning(f"No hay transmisión activa para clase {id_clase}")
+def detener_transmision(transmision_or_id_aula):
+    """Detiene la transmisión para un aula específica o un objeto de transmisión."""
+    if isinstance(transmision_or_id_aula, str):  # Si es un ID de aula
+        id_aula = transmision_or_id_aula
+        if id_aula not in transmisiones_activas:
+            logger.warning(f"No hay transmisión activa para aula {id_aula}")
             return
-        transmision = transmisiones_activas[id_clase]["transmision"]
+        transmision = transmisiones_activas[id_aula]["transmision"]
     else:  # Si es un diccionario de transmisión
-        transmision = transmision_or_id_clase
+        transmision = transmision_or_id_aula
 
     # Verificar si la transmisión ya ha sido detenida
     if transmision["detener_evento"].is_set():
-        logger.debug(f"Transmisión para clase {transmision['id_clase']} ya está detenida")
+        logger.debug(f"Transmisión para aula asociada a clase {transmision['id_clase']} ya está detenida")
         return
 
-    logger.info(f"Deteniendo transmisión para clase {transmision['id_clase']}")
+    logger.info(f"Deteniendo transmisión para aula asociada a clase {transmision['id_clase']}")
     transmision["detener_evento"].set()
     # Registrar las detecciones pendientes antes de detener
     with transmision["detecciones_lock"]:
@@ -54,30 +54,29 @@ def detener_transmision(transmision_or_id_clase):
     if transmision.get("proceso_ffmpeg"):
         transmision["proceso_ffmpeg"].terminate()
         transmision["proceso_ffmpeg"].wait()  # Asegurar que el proceso FFmpeg termine
-    logger.info(f"Transmisión detenida para clase {transmision['id_clase']}")
-    # Cerrar todas las ventanas de OpenCV
+    logger.info(f"Transmisión detenida para aula asociada a clase {transmision['id_clase']}")
     cv2.destroyAllWindows()
 
 def hay_transmision_activa(transmision):
     """Verifica si una transmisión está activa."""
     return not transmision["detener_evento"].is_set()
 
-def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision):
+def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, transmision):
     """
-    Inicia la transmisión para una clase específica, procesando video desde una fuente local o remota.
-    
+    Inicia la transmisión para un aula específica, procesando video desde una fuente local o remota.
+
     Args:
-        id_clase (str): Identificador de la clase.
+        id_aula (str): Identificador del aula.
+        id_clase (str): Identificador de la clase activa para el aula.
         transmisiones_activas (dict): Diccionario de transmisiones activas.
         transmision (dict): Objeto de transmisión con estado y configuraciones.
     """
-    logger.debug(f"Evento detener inicializado para clase {id_clase}: {transmision['detener_evento'].is_set()}")
+    logger.debug(f"Evento detener inicializado para aula {id_aula} con clase {id_clase}")
 
     width, height = 640, 480
     embeddings_dict = cargar_embeddings_por_clase(id_clase)
     tracker = FaceTracker(embeddings_dict=embeddings_dict)
 
-    # Modo local (desactivado actualmente; descomentar si es necesario)
     if MODO_LOCAL:
         logger.info("Modo local activo")
         cap = cv2.VideoCapture(0) if MODO_LOCAL_CAMARA else cv2.VideoCapture(VIDEO_TEST_PATH)
@@ -120,9 +119,14 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
                 transmision["ultimo_registro"] = ahora
 
             video_pantalla(cv2, id_clase, procesado)
+            # Actualizar la ventana y permitir eventos de teclado
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                logger.info("Tecla 'q' presionada. Deteniendo la transmisión.")
+                transmision["detener_evento"].set()
 
         logger.info("Bucle de recepción terminado")
         cap.release()
+        return transmision
 
     else:
         logger.info("Iniciando recepción de video desde FFmpeg...")
@@ -207,7 +211,7 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
                                     transmision["detecciones_temporales"].clear()
                             transmision["ultimo_registro"] = ahora
 
-                except Exception as e:
+                except Exception:
                     # Logging desactivado por rendimiento; descomentar si es necesario para depuración
                     # logger.debug(f"Error al leer datos de FFmpeg: {e}")
                     continue
@@ -219,7 +223,7 @@ def iniciar_transmision_para_clase(id_clase, transmisiones_activas, transmision)
             # No llamar a detener_transmision aquí, ya que se llama en EstadoTransmision.post
             pass
 
-    return transmision
+        return transmision
 
 def generar_frames(transmision):
     """Genera un stream de frames para el frontend."""
