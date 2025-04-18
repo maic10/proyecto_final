@@ -282,3 +282,11 @@ export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clas
 export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
   return await obtenerClasesAdmin(asignaturaId, undefined, undefined);
 };
+
+
+//export async function obtenerStreamVideo(idClase: string) {
+//  const res = await axiosInstance.get(`/transmision/video/${idClase}`, {
+//    responseType: 'blob', // Obtener la respuesta como un blob para el stream
+//  });
+//  return res; // Devuelve el blob directamente
+//}

@@ -10,7 +10,8 @@ from src.servidor.video.receptor import iniciar_transmision_para_clase, detener_
 from src.logica.utils import (
     obtener_clase_activa_para_aula,
     obtener_aula_por_raspberry,
-    crear_asistencia_si_no_existe
+    crear_asistencia_si_no_existe,
+    obtener_aula_por_clase
 )
 from src.logica.logger import logger
 from src.servidor.api.auth_raspberry import raspberry_token_required
@@ -190,27 +191,37 @@ class EstadoTransmision(Resource):
 @ns.route("/estado_web")
 class EstadoTransmisionWeb(Resource):
     @jwt_required()
-    @ns.doc(params={"id_aula": "ID del aula"})
+    @ns.doc(params={"id_clase": "ID de la clase"})
     def get(self):
-        """Verifica si hay una transmisión activa para un aula (para el frontend)."""
+        """Verifica si hay una transmisión activa para una clase (para el frontend)."""
         parser = reqparse.RequestParser()
-        parser.add_argument("id_aula", type=str, required=True)
+        parser.add_argument("id_clase", type=str, required=True)
         args = parser.parse_args()
 
-        id_aula = args["id_aula"]
+        id_clase = args["id_clase"]
+        id_aula = obtener_aula_por_clase(id_clase)
+        if not id_aula:
+            logger.warning(f"No se encontró aula activa para clase {id_clase}")
+            return {"transmitir": False}, 200
+
         transmitir = es_transmision_activa(id_aula)
         return {"transmitir": transmitir}, 200
 
-@ns.route("/transmision/video/<string:id_aula>")
+@ns.route("/transmision/video/<string:id_clase>")
 class VideoStreamRoute(Resource):
-    @jwt_required()
-    def get(self, id_aula):
-        """Genera un stream de video para el aula especificada."""
+    #@jwt_required()
+    def get(self, id_clase):
+        """Genera un stream de video para la clase especificada."""
+        id_aula = obtener_aula_por_clase(id_clase)
+        if not id_aula:
+            logger.warning(f"No se encontró aula activa para clase {id_clase}")
+            return {"error": "No hay aula asociada para esta clase"}, 404
+
         if not es_transmision_activa(id_aula):
             logger.warning(f"No hay transmisión activa para aula {id_aula}")
             return {"error": "No hay transmisión activa para esta aula"}, 503
         
-        logger.info(f"Generando stream de video para aula {id_aula}")
+        logger.info(f"Generando stream de video para aula {id_aula} con clase {id_clase}")
         return Response(
             generar_frames(transmisiones_activas[id_aula]["transmision"]),
             mimetype='multipart/x-mixed-replace; boundary=frame'

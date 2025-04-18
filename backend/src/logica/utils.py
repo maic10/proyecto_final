@@ -232,3 +232,47 @@ def get_clases_by_usuario(id_usuario):
     except Exception as e:
         logger.error(f"Error al obtener clases para el usuario {id_usuario}: {str(e)}")
         raise
+
+
+def obtener_aula_por_clase(id_clase: str) -> str:
+    """
+    Determina el id_aula asociado a una clase en el momento actual según su horario.
+
+    Args:
+        id_clase (str): Identificador de la clase.
+
+    Returns:
+        str: El id_aula asociado, o None si no hay horario activo.
+    """
+    # Obtener la fecha y hora actual
+    now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
+    zona_horaria = pytz.timezone("Europe/Madrid")
+    now = now_utc.astimezone(zona_horaria)
+    dia_actual_ingles = now.strftime("%A").lower()  # Ej. "monday"
+    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles)  # Convertir a español, ej. "lunes"
+    hora_actual = now.time()
+
+    # Buscar la clase especificada
+    clase = clases_collection.find_one({"id_clase": id_clase})
+    if not clase:
+        logger.warning(f"No se encontró la clase {id_clase}")
+        return None
+
+    for horario in clase.get("horarios", []):
+        if horario["dia"] != dia_actual:
+            continue
+
+        # Convertir hora_inicio y hora_fin a objetos time
+        try:
+            hora_inicio = datetime.strptime(horario["hora_inicio"], "%H:%M").time()
+            hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()
+        except ValueError as e:
+            logger.error(f"Formato de hora inválido en horario de clase {id_clase}: {e}")
+            continue
+
+        # Comparar si la hora actual está dentro del rango
+        if hora_inicio <= hora_actual <= hora_fin:
+            return horario["id_aula"]
+
+    logger.debug(f"No hay horario activo para clase {id_clase} en este momento")
+    return None
