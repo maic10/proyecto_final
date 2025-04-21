@@ -26,7 +26,7 @@ class Detections:
         self.cls = cls
 
 class FaceTracker:
-    def __init__(self, frame_rate=15, embeddings_dict=None, detect_every_n=1, similarity_threshold=0.5, verbose=False):
+    def __init__(self, frame_rate=30, embeddings_dict=None, detect_every_n=1, similarity_threshold=0.5, verbose=False):
         logger.info("Cargando modelo Buffalo para detección...")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.detector = FaceAnalysis(name="buffalo_sc", providers=['CUDAExecutionProvider'] if self.device == 'cuda' else ['CPUExecutionProvider'])
@@ -119,11 +119,11 @@ class FaceTracker:
                         best_match_id = self.all_ids[best_idx]
                         new_identified[track_id] = (best_match_id, best_similarity)
                         #if self.verbose:
-                        #    logger.info(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
+                        #logger.info(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
                     else:
                         new_identified[track_id] = ("Desconocido", best_similarity)
                         #if self.verbose:
-                        #    logger.info(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
+                        #logger.info(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
 
         # Actualizar solo tracks nuevos o "Desconocido"
         for track_id, identity in new_identified.items():
@@ -208,10 +208,12 @@ class FaceTracker:
 
             cv2.rectangle(frame_resized, (x1, y1), (x2, y2), color, 2)
 
+            """
             label = f"ID: {track_id}"
             if track_id in identified:
                 label += f" - {identified[track_id][0]}"
-            cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            cv2.putText(frame_resized, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)´
+            """
 
         # Actualizar y dibujar FPS
         frame_resized = self.update_fps(frame_resized)

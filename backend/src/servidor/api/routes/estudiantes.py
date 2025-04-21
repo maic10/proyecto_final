@@ -4,7 +4,7 @@ from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
 from src.logica.database import get_user_by_id, estudiantes_collection, fs, clases_collection
-from src.logica.utils import get_clases_by_usuario
+from src.logica.utils import obtener_clases_por_usuario
 from src.modelos.estudiante import estudiante_model
 from src.logica.logger import logger
 from src.logica.gridfs_embeddings_generator import GridFSEmbeddingsGenerator
@@ -43,7 +43,7 @@ class EstudiantesResource(Resource):
             estudiantes = estudiantes_collection.find()
             estudiantes_unicos = list({est["id_estudiante"]: est for est in estudiantes}.values())
         else:
-            clases = list(get_clases_by_usuario(identity))
+            clases = list(obtener_clases_por_usuario(identity))
             if not clases:
                 logger.info("El profesor no tiene clases asignadas")
                 return [], 200
@@ -420,7 +420,7 @@ class ServirImagen(Resource):
                     logger.error(f"Estudiante {id_estudiante} no encontrado para la imagen {file_id}")
                     return {"error": "Estudiante no encontrado"}, 404
 
-                clases = get_clases_by_usuario(identity)
+                clases = obtener_clases_por_usuario(identity)
                 clases_ids = [clase["id_clase"] for clase in clases]
                 if not any(clase_id in clases_ids for clase_id in estudiante["ids_clases"]):
                     logger.error(f"Usuario {identity} no tiene acceso a la imagen {file_id}")

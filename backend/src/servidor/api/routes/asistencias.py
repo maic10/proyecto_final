@@ -35,7 +35,7 @@ class ActualizarAsistenciaResource(Resource):
     @ns.expect(ns.model("ActualizarEstado", {
         "id_clase": fields.String(required=True, description="ID de la clase"),
         "fecha": fields.String(required=True, description="Fecha de la asistencia (YYYY-MM-DD)"),
-        "estado": fields.String(required=True, enum=["confirmado", "duda", "ausente"])
+        "estado": fields.String(required=True, enum=["confirmado", "tarde", "ausente"])
     }))
     def put(self, id_estudiante):
         """Actualiza el estado de asistencia de un estudiante"""
@@ -283,121 +283,6 @@ class ExportarAsistenciasResource(Resource):
                 aula_doc = get_aula_by_id(id_aula)
                 aulas_dict[id_aula] = aula_doc["nombre"] if aula_doc else "Aula desconocida"
             nombre_aula = aulas_dict.get(id_aula, "Aula desconocida")
-
-            for r in doc.get("registros", []):
-                estudiante = estudiantes_collection.find_one({"id_estudiante": r["id_estudiante"]})
-                if estudiante:
-                    nombre_estudiante = f"{estudiante['nombre']} {estudiante['apellido']}"
-                else:
-                    nombre_estudiante = "Estudiante no registrado"
-
-                registros_exportar.append({
-                    "Fecha": doc["fecha"],
-                    "Clase": nombre_clase,
-                    "Aula": nombre_aula,
-                    "Estudiante": nombre_estudiante,
-                    "Estado": r.get("estado"),
-                    "Fecha detección": r.get("fecha_deteccion"),
-                    "Modificado por": r.get("modificado_por_usuario"),
-                    "Fecha modificación": r.get("modificado_fecha")
-                })
-
-        if not registros_exportar:
-            logger.info(f"No se encontraron registros para exportar para el profesor {identity}")
-            return {"mensaje": "No se encontraron registros para exportar"}, 404
-
-        df = pd.DataFrame(registros_exportar)
-
-        if formato == "csv":
-            # Exportar a CSV
-            output = io.StringIO()
-            df.to_csv(output, index=False, encoding='utf-8')
-            output.seek(0)
-            return send_file(
-                io.BytesIO(output.getvalue().encode('utf-8')),
-                as_attachment=True,
-                download_name="asistencias.csv",
-                mimetype="text/csv"
-            )
-        else:
-            # Exportar a Excel (xlsx)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, sheet_name='Asistencias')
-            output.seek(0)
-            return send_file(
-                output,
-                as_attachment=True,
-                download_name="asistencias.xlsx",
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-@ns.route("/asistencias/exportar")
-class ExportarAsistenciasResource(Resource):
-    @jwt_required()
-    @ns.doc(params={
-        "id_clase": "ID de la clase (opcional, si no se especifica, exporta todas las clases del profesor)",
-        "fecha_inicio": "Fecha de inicio (YYYY-MM-DD, requerido)",
-        "fecha_fin": "Fecha de fin (YYYY-MM-DD, requerido)",
-        "formato": "Formato de exportación (xlsx o csv, por defecto xlsx)"
-    })
-    def get(self):
-        """Exporta asistencias en formato Excel (.xlsx) o CSV con nombres completos"""
-        identity = get_jwt_identity()
-        user = get_user_by_id(identity)
-
-        if not user or user["rol"] != "profesor":
-            logger.error(f"Usuario {identity} no tiene permisos de profesor")
-            return {"error": "Acceso denegado"}, 403
-
-        parser = reqparse.RequestParser()
-        parser.add_argument("id_clase", type=str, required=False)
-        parser.add_argument("fecha_inicio", type=str, required=True)
-        parser.add_argument("fecha_fin", type=str, required=True)
-        parser.add_argument("formato", type=str, required=False, choices=["xlsx", "csv"], default="xlsx")
-        args = parser.parse_args()
-
-        id_clase = args["id_clase"]
-        fecha_inicio = args["fecha_inicio"]
-        fecha_fin = args["fecha_fin"]
-        formato = args["formato"]
-
-        # Construir la consulta para las clases del profesor
-        query_clases = {"id_usuario": identity}
-        if id_clase:
-            query_clases["id_clase"] = id_clase
-
-        clases = list(clases_collection.find(query_clases))
-        if not clases:
-            logger.info(f"No se encontraron clases para el profesor {identity}")
-            return {"mensaje": "No se encontraron clases para exportar"}, 404
-
-        # Obtener los IDs de las clases
-        ids_clases = [clase["id_clase"] for clase in clases]
-
-        # Construir la consulta para las asistencias
-        query_asistencias = {
-            "id_clase": {"$in": ids_clases},
-            "fecha": {"$gte": fecha_inicio, "$lte": fecha_fin}
-        }
-
-        asistencias = asistencias_collection.find(query_asistencias)
-
-        # Cache para clases y aulas
-        clases_dict = {clase["id_clase"]: clase for clase in clases}
-        aulas_dict = {}
-        registros_exportar = []
-
-        for doc in asistencias:
-            id_clase = doc["id_clase"]
-            clase = clases_dict.get(id_clase, {})
-            nombre_clase = clase.get("nombre", "Clase no encontrada")
-
-            id_aula = doc.get("id_aula")
-            if id_aula not in aulas_dict:
-                aula_doc = get_aula_by_id(id_aula)
-                aulas_dict[id_aula] = aula_doc["nombre"] if aula_doc else "Aula desconocida"
-            nombre_aula = aulas_dict[id_aula]
 
             for r in doc.get("registros", []):
                 estudiante = estudiantes_collection.find_one({"id_estudiante": r["id_estudiante"]})

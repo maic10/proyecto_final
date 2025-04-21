@@ -6,7 +6,7 @@ import threading
 import time
 from src.servidor.api import ns
 from flask_jwt_extended import jwt_required
-from src.servidor.video.receptor import iniciar_transmision_para_clase, detener_transmision, generar_frames
+from src.logica.receptor import iniciar_transmision_para_clase, detener_transmision, generar_frames
 from src.logica.utils import (
     obtener_clase_activa_para_aula,
     obtener_aula_por_raspberry,
@@ -278,57 +278,3 @@ class AjustarTiempoMaximo(Resource):
         logger.info(f"Tiempo máximo ajustado a {tiempo_maximo} minutos para clase {id_clase}")
         return {"mensaje": f"Tiempo máximo ajustado a {tiempo_maximo} minutos"}, 200
     
-@ns.route("/asistencias/<string:id_estudiante>")
-class ActualizarAsistencia(Resource):
-    @jwt_required()
-    def put(self, id_estudiante):
-        """Actualiza el estado de una asistencia."""
-        data = request.get_json()
-        if not data or "id_clase" not in data or "fecha" not in data or "estado" not in data:
-            logger.error("Faltan parámetros requeridos en el cuerpo JSON")
-            return {"error": "Faltan parámetros requeridos (id_clase, fecha, estado)"}, 400
-
-        id_clase = data["id_clase"]
-        fecha = data["fecha"]
-        nuevo_estado = data["estado"]
-        modificado_por_usuario = data.get("modificado_por_usuario", "desconocido")
-        modificado_fecha = data.get("modificado_fecha", datetime.utcnow().isoformat() + "Z")
-
-        if nuevo_estado not in ["confirmado", "tarde", "ausente"]:
-            logger.error(f"Estado inválido: {nuevo_estado}")
-            return {"error": "Estado inválido"}, 400
-
-        # Buscar el documento de asistencia
-        doc = mongo.db.asistencias.find_one({
-            "id_clase": id_clase,
-            "fecha": fecha
-        })
-        if not doc:
-            logger.warning(f"Documento no encontrado para clase {id_clase} en {fecha}")
-            return {"error": "Asistencia no encontrada"}, 404
-
-        # Buscar el registro del estudiante
-        registros = doc["registros"]
-        estudiante_encontrado = None
-        for registro in registros:
-            if registro["id_estudiante"] == id_estudiante:
-                estudiante_encontrado = registro
-                break
-
-        if not estudiante_encontrado:
-            logger.warning(f"Estudiante {id_estudiante} no encontrado en registros de clase {id_clase}")
-            return {"error": "Estudiante no encontrado en la asistencia"}, 404
-
-        # Actualizar el registro
-        mongo.db.asistencias.update_one(
-            {"id_clase": id_clase, "fecha": fecha, "registros.id_estudiante": id_estudiante},
-            {
-                "$set": {
-                    "registros.$.estado": nuevo_estado,
-                    "registros.$.modificado_por_usuario": modificado_por_usuario,
-                    "registros.$.modificado_fecha": modificado_fecha
-                }
-            }
-        )
-        logger.info(f"Estado de asistencia actualizado para estudiante {id_estudiante} en clase {id_clase}: {nuevo_estado}")
-        return {"mensaje": "Estado actualizado exitosamente"}, 200

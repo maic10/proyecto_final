@@ -13,9 +13,9 @@ from src.logica.utils import (
 )
 
 # Constantes de configuración
-MODO_LOCAL = False
-MODO_LOCAL_CAMARA = False
-VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/video_1.mp4"
+MODO_LOCAL = True
+MODO_LOCAL_CAMARA = True
+VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/alumnos_1.mp4"
 INTERVALO_REGISTRO_ASISTENCIA = 10  # Intervalo para registrar asistencias (segundos)
 TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos en segundos
 
@@ -80,9 +80,9 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
     """
     logger.debug(f"Evento detener inicializado para aula {id_aula} con clase {id_clase}")
 
-    width, height = 640, 480
+    width, height = 640, 480 #1920, 1080
     embeddings_dict = cargar_embeddings_por_clase(id_clase)
-    tracker = FaceTracker(embeddings_dict=embeddings_dict)
+    tracker = FaceTracker(embeddings_dict=embeddings_dict,frame_rate=30,detect_every_n = 1)
 
     if MODO_LOCAL:
         logger.info("Modo local activo")
@@ -129,11 +129,11 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
                         transmision["detecciones_temporales"].clear()
                 transmision["ultimo_registro"] = ahora
 
-            video_pantalla(cv2, id_clase, procesado)
+            #video_pantalla(cv2, id_clase, procesado)
             # Actualizar la ventana y permitir eventos de teclado
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                logger.info("Tecla 'q' presionada. Deteniendo la transmisión.")
-                transmision["detener_evento"].set()
+            #if cv2.waitKey(1) & 0xFF == ord('q'):
+            #    logger.info("Tecla 'q' presionada. Deteniendo la transmisión.")
+             #   transmision["detener_evento"].set()
 
         logger.info("Bucle de recepción terminado")
         cap.release()
@@ -172,7 +172,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
 
             # Bucle para leer datos de FFmpeg
             frame_size = width * height * 3  # Tamaño esperado de un frame (921600 bytes)
-            chunk_size = 65536  # Leer fragmentos de 64 KB para reducir iteraciones
+            chunk_size = 65536  #262144  # Leer fragmentos de 64 KB para reducir iteraciones
             frame_buffer = bytearray()  # Buffer para acumular datos
 
             while not transmision["detener_evento"].is_set():
@@ -180,7 +180,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
                     chunk = transmision["proceso_ffmpeg"].stdout.read(chunk_size)
                     if not chunk:
                         # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                        # logger.debug("No se recibieron datos de FFmpeg")
+                        logger.debug("No se recibieron datos de FFmpeg")
                         continue
                     frame_buffer.extend(chunk)
 
@@ -190,6 +190,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
                         frame_buffer = frame_buffer[frame_size:]
 
                         frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
+
                         frame_procesado = tracker.process_frame(frame)
 
                         if frame_procesado is None or not isinstance(frame_procesado, np.ndarray):
@@ -199,7 +200,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
 
                         with transmision["lock"]:
                             transmision["frame"] = frame_procesado.copy()
-
+                        
                         # Almacenar detecciones en la caché
                         with transmision["detecciones_lock"]:
                             for track_id, (nombre, confianza) in tracker.identified_faces.items():

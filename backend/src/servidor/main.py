@@ -7,7 +7,6 @@ ruta_proyecto = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 sys.path.append(ruta_proyecto)
 
 from src.servidor.api import app
-from src.servidor.video.sdp_generator import generate_sdp_file
 
 if __name__ == "__main__":
     #generate_sdp_file()  # Generar stream.sdp con la IP del servidor

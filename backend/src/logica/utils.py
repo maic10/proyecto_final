@@ -16,7 +16,6 @@ DIAS_EN_ESPANOL = {
     "sunday": "domingo"
 }
 
-# Ajustar el indice en DB
 def cargar_embeddings_por_clase(id_clase):
     """
     Carga solo los embeddings de estudiantes que pertenecen a una clase específica.
@@ -36,7 +35,6 @@ def cargar_embeddings_por_clase(id_clase):
     except Exception as e:
         logger.error(f"Error al cargar embeddings para clase {id_clase}: {e}")
     return embeddings_dict
-
 
 def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio, tiempo_maximo_deteccion):
     """
@@ -149,45 +147,6 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio
     except Exception as e:
         logger.error(f"Error al registrar asistencia para estudiante {id_estudiante} en clase {id_clase}: {e}")
     
-""""
-"" /transmision/iniciar"
-"""
-
-"""
-def obtener_clase_activa_para_aula(id_aula,detener=False):
-
-    ahora = datetime.now(pytz.timezone("Europe/Madrid"))
-    dia_semana = "monday" #ahora.strftime('%A').lower()
-    hora_actual = ahora.strftime('%H:%M')
-
-    fecha_fin = hora_actual
-    print(f"[TRANSMISION] Verificando clase activa para aula {id_aula} en {dia_semana} a las {hora_actual}")
-    
-    if detener: fecha_fin = "09:00"  ## Solo para TEST
-
-    clases = mongo.db.clases.find({
-        "horarios": {
-            "$elemMatch": {
-                "dia": dia_semana,
-                "id_aula": id_aula,
-                "hora_inicio": {"$lte": hora_actual},
-                "hora_fin": {"$gt": fecha_fin}
-            }
-        }
-    })
-
-    for clase in clases:
-        print(f"[TRANSMISION] Clase activa detectada: {clase['id_clase']}")
-        return clase["id_clase"]
-
-    print("[TRANSMISION] No se encontró clase activa")
-    return None    
-"""
-
-#def obtener_aula_por_raspberry(id_rpi):
-#    rpi = mongo.db.configuracion_raspberry.find_one({"id_raspberry_pi": id_rpi})
-#    return rpi.get("id_aula") if rpi else None
-
 def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
     existe = mongo.db.asistencias.find_one({"id_clase": id_clase, "fecha": fecha_str})
     if not existe:
@@ -201,7 +160,6 @@ def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
     else:
         print(f"[ASISTENCIA] Documento ya existe para {id_clase} en {fecha_str}")
 
-########################### NUEVO ###########################
 def obtener_aula_por_raspberry(id_raspberry_pi: str) -> str:
     """
     Obtiene el ID del aula asignada a una Raspberry Pi.
@@ -250,7 +208,6 @@ def obtener_clase_activa_para_aula(id_aula: str, detener: bool = False) -> str:
 
     return None
 
-
 def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> None:
     """
     Crea un registro de asistencia si no existe para la clase, fecha y aula.
@@ -282,7 +239,7 @@ def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> No
     # Crear el documento de asistencia
     create_asistencia(id_clase, fecha, id_aula, registros)
 
-def get_clases_by_usuario(id_usuario):
+def obtener_clases_por_usuario(id_usuario):
     """
     Obtiene todas las clases asociadas a un usuario (profesor) por su id_usuario.
     
@@ -298,7 +255,6 @@ def get_clases_by_usuario(id_usuario):
     except Exception as e:
         logger.error(f"Error al obtener clases para el usuario {id_usuario}: {str(e)}")
         raise
-
 
 def obtener_aula_por_clase(id_clase: str) -> str:
     """

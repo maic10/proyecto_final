@@ -1,4 +1,3 @@
-# src/modelos/asignatura.py
 from src.servidor.api import ns
 from flask_restx import fields
 
