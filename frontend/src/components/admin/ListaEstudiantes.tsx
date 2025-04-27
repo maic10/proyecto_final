@@ -10,6 +10,11 @@ interface ListaEstudiantesProps {
 const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
   const navigate = useNavigate();
 
+  const handleSelectEstudiante = (idEstudiante: string) => {
+    // Pasar el id_estudiante a través del estado en lugar de la URL
+    navigate('/admin/estudiantes/editar', { state: { idEstudiante } });
+  };
+
   return (
     <div className="list-group">
       {estudiantes.map((estudiante) => (
@@ -17,7 +22,7 @@ const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
           key={estudiante.id_estudiante}
           className="list-group-item list-group-item-action d-flex align-items-center"
           style={{ cursor: 'pointer' }}
-          onClick={() => navigate(`/admin/estudiantes/editar/${estudiante.id_estudiante}`)}
+          onClick={() => handleSelectEstudiante(estudiante.id_estudiante)}
         >
           {estudiante.imagenes && estudiante.imagenes.length > 0 ? (
             <img
@@ -25,7 +30,7 @@ const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
               alt={`${estudiante.nombre}`}
               className="rounded-circle me-3"
               style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-              loading="lazy" // Carga diferida
+              loading="lazy"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 e.currentTarget.src = noPhoto;
@@ -37,7 +42,7 @@ const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
               alt="Sin Foto"
               className="rounded-circle me-3"
               style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-              loading="lazy" // Carga diferida
+              loading="lazy"
             />
           )}
           <div>

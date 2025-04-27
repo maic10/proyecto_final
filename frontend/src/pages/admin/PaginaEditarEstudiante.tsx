@@ -1,13 +1,15 @@
 // src/pages/admin/PaginaEditarEstudiante.tsx
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import FormularioEditarEstudiante from '../../components/admin/FormularioEditarEstudiante';
 import { Estudiante, ClaseAsignada } from '../../types/estudiantes';
 import { obtenerEstudiantePorId, actualizarEstudiante, eliminarEstudiante, obtenerClasesAdmin } from '../../state/api';
 
 const PaginaEditarEstudiante: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { idEstudiante } = location.state || {}; // Obtener el ID desde el estado
+
   const [estudiante, setEstudiante] = useState<Estudiante | null>(null);
   const [clasesAsignadas, setClasesAsignadas] = useState<ClaseAsignada[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -18,8 +20,16 @@ const PaginaEditarEstudiante: React.FC = () => {
     const cargarEstudianteYClases = async () => {
       setCargando(true);
       setError(null);
+
+      if (!idEstudiante) {
+        setError('ID de estudiante no proporcionado');
+        setCargando(false);
+        navigate('/admin/estudiantes');
+        return;
+      }
+
       try {
-        const estudianteData = await obtenerEstudiantePorId(id!);
+        const estudianteData = await obtenerEstudiantePorId(idEstudiante);
         setEstudiante(estudianteData);
 
         const clases: ClaseAsignada[] = [];
@@ -43,12 +53,12 @@ const PaginaEditarEstudiante: React.FC = () => {
     };
 
     cargarEstudianteYClases();
-  }, [id]); // Solo depende de id, no de estudiante ni clasesAsignadas
+  }, [idEstudiante, navigate]);
 
   // Función para recargar las imágenes del estudiante
   const handleReloadImages = async () => {
     try {
-      const estudianteActualizado = await obtenerEstudiantePorId(id!);
+      const estudianteActualizado = await obtenerEstudiantePorId(idEstudiante);
       setEstudiante(estudianteActualizado);
     } catch (err: any) {
       console.error('Error al recargar las imágenes:', err);

@@ -103,7 +103,7 @@ function AppWrapper() {
           }
         />
         <Route
-          path="/admin/estudiantes/editar/:id"
+          path="/admin/estudiantes/editar"
           element={
             <RutaPrivada roles={['admin']}>
               <PaginaEditarEstudiante />
@@ -119,7 +119,7 @@ function AppWrapper() {
           }
         />
         <Route
-          path="/admin/horarios/editar/:id"
+          path="/admin/horarios/editar"
           element={
             <RutaPrivada roles={['admin']}>
               <PaginaEditarHorarios />
