@@ -6,12 +6,13 @@ import threading
 import time
 from src.servidor.api import ns
 from flask_jwt_extended import jwt_required
-from src.logica.receptor import iniciar_transmision_para_clase, detener_transmision, generar_frames
+from src.logica.receptor import iniciar_transmision_para_aula, detener_transmision, generar_frames
 from src.logica.utils import (
     obtener_clase_activa_para_aula,
     obtener_aula_por_raspberry,
     crear_asistencia_si_no_existe,
-    obtener_aula_por_clase
+    obtener_aula_por_clase,
+    verificar_clase_activa
 )
 from src.logica.logger import logger
 from src.servidor.api.auth_raspberry import raspberry_token_required
@@ -36,7 +37,9 @@ def es_transmision_activa(id_aula):
         transmision = transmisiones_activas[id_aula]["transmision"]
         thread = transmisiones_activas[id_aula]["thread"]
         if not transmision["detener_evento"].is_set() and thread.is_alive():
+            logger.debug(f"Transmisión activa encontrada para aula {id_aula}")
             return True
+        logger.debug(f"Transmisión para aula {id_aula} no está activa: detener_evento={transmision['detener_evento'].is_set()}, thread_alive={thread.is_alive()}")
         transmisiones_activas.pop(id_aula, None)
     return False
 
@@ -106,7 +109,7 @@ class IniciarTransmision(Resource):
         # Iniciar transmisión en un hilo
         def iniciar_transmision_hilo(transmision):
             try:
-                iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, transmision)
+                iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, transmision)
             except Exception as e:
                 logger.error(f"Error en transmisión para aula {id_aula}: {e}")
                 detener_transmision(transmision)
@@ -134,29 +137,35 @@ class IniciarTransmision(Resource):
 class EstadoTransmision(Resource):
     @raspberry_token_required
     def post(self):
-        """Verifica el estado de la transmisión y detiene si no hay clase activa."""
+        """Verifica el estado de la transmisión y detiene si la clase conocida ya no está activa."""
         data = request.get_json()
         if not data or "id_raspberry_pi" not in data:
-            logger.error("Falta 'id_raspberry_pi' en el cuerpo JSON")
+            #logger.error("Falta 'id_raspberry_pi' en el cuerpo JSON")
             return {"error": "Falta 'id_raspberry_pi' en el cuerpo JSON"}, 400
 
         id_rpi = data["id_raspberry_pi"]
         if id_rpi != request.raspberry_id:
-            logger.error(f"Raspberry ID no coincide: {id_rpi} != {request.raspberry_id}")
+            #logger.error(f"Raspberry ID no coincide: {id_rpi} != {request.raspberry_id}")
             return {"error": "Raspberry ID no coincide con el token"}, 403
+
+        #logger.debug(f"Verificando estado de transmisión para RPI {id_rpi}")
 
         id_aula = obtener_aula_por_raspberry(id_rpi)
         if not id_aula:
-            logger.warning(f"Raspberry {id_rpi} no asignada a ninguna aula")
+            #logger.warning(f"Raspberry {id_rpi} no asignada a ninguna aula")
             return {"error": "Raspberry no asignada a ninguna aula"}, 404
 
-        id_clase = obtener_clase_activa_para_aula(id_aula, detener=True)
+        #logger.debug(f"Aula encontrada para RPI {id_rpi}: {id_aula}")
 
         if id_aula in transmisiones_activas:
             active_clase = transmisiones_activas[id_aula]["id_clase"]
-            if not id_clase or id_clase != active_clase:
+            #logger.debug(f"Clase activa en transmisiones_activas para aula {id_aula}: {active_clase}")
+
+            # Verificar si la clase conocida sigue activa
+            clase_activa = verificar_clase_activa(id_aula, active_clase)
+            if not clase_activa:
                 if id_aula not in transmisiones_activas:
-                    logger.debug(f"Transmisión para aula {id_aula} ya ha sido detenida")
+                    #logger.debug(f"Transmisión para aula {id_aula} ya ha sido detenida")
                     return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
 
                 transmision = transmisiones_activas[id_aula]["transmision"]
@@ -164,6 +173,7 @@ class EstadoTransmision(Resource):
                     logger.debug(f"Transmisión para aula {id_aula} ya está detenida")
                 else:
                     detener_transmision(transmision)
+                    logger.info(f"Transmisión detenida para aula {id_aula} porque la clase {active_clase} ya no está activa")
 
                 rpi_data = transmisiones_activas.get(id_aula, {})
                 if rpi_data and rpi_data["id_rpi"] == id_rpi:
@@ -185,15 +195,15 @@ class EstadoTransmision(Resource):
                         logger.error(f"Error al notificar a RPI {id_rpi}: {e}")
 
                 transmisiones_activas.pop(id_aula, None)
-                logger.info(f"Clase {active_clase} finalizada o no activa para RPI {id_rpi}")
-                return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
+                #logger.info(f"Clase {active_clase} finalizada o no activa para RPI {id_rpi}")
+                return {"transmitir": False, "motivo": f"Clase {active_clase} finalizada o no activa"}, 200
 
-            logger.info(f"Transmisión en curso para aula {id_aula} con clase {id_clase}")
-            return {"transmitir": True, "id_clase": id_clase}, 200
+            #logger.info(f"Transmisión en curso para aula {id_aula} con clase {active_clase}")
+            return {"transmitir": True, "id_clase": active_clase}, 200
 
-        logger.info(f"Clase {id_clase} finalizada o no activa para RPI {id_rpi}")
-        return {"transmitir": False, "motivo": "Clase finalizada o no activa"}, 200
-
+        # Si no hay transmisión activa, no intentamos buscar una clase activa
+        #logger.info(f"No hay transmisión activa para aula {id_aula} y RPI {id_rpi}")
+        return {"transmitir": False, "motivo": "No hay transmisión activa"}, 200
 @ns.route("/estado_web")
 class EstadoTransmisionWeb(Resource):
     @jwt_required()

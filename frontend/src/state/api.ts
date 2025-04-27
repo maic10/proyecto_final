@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { obtenerToken, obtenerUsuario, cerrarSesion } from './auth';
 import { API_BASE } from '../utils/constants';
-import { Horario, Clase, Profesor, Asignatura,Aula } from '../types/horarios';
+import { Horario, Clase, Profesor, Aula } from '../types/horarios';
 import { Estudiante } from '../types/estudiantes';
 
 // Crear una instancia de axios
@@ -30,7 +30,6 @@ axiosInstance.interceptors.response.use(
       // Cerrar sesión y redirigir al login
       cerrarSesion();
       window.location.href = '/'; 
-      // Evitar que el error cause un bucle infinito
       return new Promise(() => {});
     }
     return Promise.reject(error);
@@ -303,6 +302,13 @@ export const ajustarTiempoMaximo = async (idClase: string, tiempoMaximo: number)
   return response.data;
 };
 
+export async function cambiarContrasena(contrasenaActual: string, nuevaContrasena: string) {
+  const res = await axiosInstance.post('/autenticacion/cambiar_contrasena', {
+    contrasenaActual,
+    nuevaContrasena
+  });
+  return res;
+}
 //export async function obtenerStreamVideo(idClase: string) {
 //  const res = await axiosInstance.get(`/transmision/video/${idClase}`, {
 //    responseType: 'blob', // Obtener la respuesta como un blob para el stream

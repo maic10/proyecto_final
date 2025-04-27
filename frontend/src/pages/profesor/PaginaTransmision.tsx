@@ -49,7 +49,7 @@ const PaginaTransmision: React.FC = () => {
 
         const ahora = new Date();
         const diaActual = ahora.getDay();
-        const diasSemana = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
         const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
 
         let claseActiva: Clase | null = null;

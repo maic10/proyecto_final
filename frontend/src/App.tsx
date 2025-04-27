@@ -15,7 +15,9 @@ import PaginaCrearEstudiante from './pages/admin/PaginaCrearEstudiante';
 import PaginaEditarEstudiante from './pages/admin/PaginaEditarEstudiante';
 import GestionarHorarios from './pages/admin/GestionarHorarios';
 import PaginaEditarHorarios from './pages/admin/PaginaEditarHorarios';
+import PaginaPerfil from './pages/profesor/PaginaPerfil';
 import { estaAutenticado } from './state/auth';
+
 
 function AppWrapper() {
   const location = useLocation();
@@ -64,6 +66,14 @@ function AppWrapper() {
           element={
             <RutaPrivada roles={['profesor']}>
               <PaginaTransmision />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaPerfil />
             </RutaPrivada>
           }
         />

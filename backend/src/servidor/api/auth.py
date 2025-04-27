@@ -4,6 +4,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from src.servidor.api import ns
 from src.modelos.usuario import usuario_model
 from src.logica.database import usuarios_collection
+from src.logica.logger import logger
 import bcrypt
 
 # Modelo de solicitud para el inicio de sesión
@@ -25,6 +26,12 @@ perfil_response_model = ns.model("PerfilResponse", {
     "name": fields.String(required=True, attribute="nombre", description="Nombre del usuario"),
     "email": fields.String(required=True, attribute="correo", description="Correo del usuario"),
     "role": fields.String(required=True, attribute="rol", description="Rol del usuario")
+})
+
+# Definir el modelo esperado para los datos del cuerpo
+cambiar_contrasena_model = ns.model("CambiarContrasena", {
+    "contrasenaActual": fields.String(required=True, description="Contraseña actual del usuario"),
+    "nuevaContrasena": fields.String(required=True, description="Nueva contraseña del usuario")
 })
 
 # Registrar la ruta para la solicitud de inicio de sesión
@@ -76,3 +83,45 @@ class PerfilResource(Resource):
             return {"mensaje": "Estructura de usuario inválida en la base de datos"}, 500
 
         return usuario, 200
+    
+@ns.route('/autenticacion/cambiar_contrasena')
+class CambiarContrasena(Resource):
+    @jwt_required()
+    @ns.expect(cambiar_contrasena_model)
+    @ns.doc(description="Cambia la contraseña del usuario autenticado")
+    @ns.response(200, "Contraseña actualizada con éxito")
+    @ns.response(404, "Usuario no encontrado")
+    @ns.response(422, "La contraseña actual es incorrecta")
+    def post(self):
+        """Cambia la contraseña del usuario autenticado."""
+        # Usar ns.payload para obtener los datos del cuerpo
+        data = ns.payload
+        logger.debug(f"Recibida solicitud para cambiar contraseña: {data}")
+
+        contrasena_actual = data.get('contrasenaActual')
+        nueva_contrasena = data.get('nuevaContrasena')
+
+        # Obtener el usuario autenticado
+        id_usuario = get_jwt_identity()
+        usuario = usuarios_collection.find_one({"id_usuario": id_usuario})
+
+        if not usuario:
+            logger.error(f"Usuario no encontrado: {id_usuario}")
+            return {"error": "Usuario no encontrado"}, 404
+
+        # Verificar la contraseña actual
+        if not bcrypt.checkpw(contrasena_actual.encode('utf-8'), usuario["contraseña"].encode('utf-8')):
+            logger.error(f"Contraseña actual incorrecta para usuario: {id_usuario}")
+            return {"error": "La contraseña actual es incorrecta"}, 422
+
+        # Encriptar la nueva contraseña
+        nueva_contrasena_hash = bcrypt.hashpw(nueva_contrasena.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        # Actualizar la contraseña en la base de datos
+        usuarios_collection.update_one(
+            {"id_usuario": id_usuario},
+            {"$set": {"contraseña": nueva_contrasena_hash}}
+        )
+
+        logger.info(f"Contraseña actualizada para usuario: {id_usuario}")
+        return {"mensaje": "Contraseña actualizada con éxito"}, 200

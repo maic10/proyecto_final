@@ -13,9 +13,9 @@ from src.logica.utils import (
 )
 
 # Constantes de configuración
-MODO_LOCAL = True
-MODO_LOCAL_CAMARA = True
-VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/alumnos_1.mp4"
+MODO_LOCAL = False
+MODO_LOCAL_CAMARA = False
+VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/clase_3.mp4"
 INTERVALO_REGISTRO_ASISTENCIA = 10  # Intervalo para registrar asistencias (segundos)
 TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos en segundos
 
@@ -68,7 +68,7 @@ def hay_transmision_activa(transmision):
     """Verifica si una transmisión está activa."""
     return not transmision["detener_evento"].is_set()
 
-def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, transmision):
+def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, transmision):
     """
     Inicia la transmisión para un aula específica, procesando video desde una fuente local o remota.
 
@@ -80,9 +80,9 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
     """
     logger.debug(f"Evento detener inicializado para aula {id_aula} con clase {id_clase}")
 
-    width, height = 640, 480 #1920, 1080
+    width, height = 640, 480 
     embeddings_dict = cargar_embeddings_por_clase(id_clase)
-    tracker = FaceTracker(embeddings_dict=embeddings_dict,frame_rate=30,detect_every_n = 1)
+    tracker = FaceTracker(embeddings_dict=embeddings_dict,frame_rate=30,detect_every_n = 3)
 
     if MODO_LOCAL:
         logger.info("Modo local activo")
@@ -103,7 +103,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
             with transmision["lock"]:
                 transmision["frame"] = procesado.copy()
 
-            # Almacenar detecciones en la caché
+            # Almacenar detecciones en la memória
             with transmision["detecciones_lock"]:
                 for track_id, (nombre, confianza) in tracker.identified_faces.items():
                     if nombre != "Desconocido":
@@ -148,7 +148,7 @@ def iniciar_transmision_para_clase(id_aula, id_clase, transmisiones_activas, tra
             '-flags', '+low_delay',
             '-analyzeduration', '1',
             '-probesize', '32',
-            '-i', 'stream.sdp',
+            '-i', 'stream.sdp', 
             '-f', 'image2pipe',
             '-pix_fmt', 'bgr24',
             '-vsync', '0',
