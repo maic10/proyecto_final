@@ -180,7 +180,7 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
       <h2 className="mb-2">Editar Horarios</h2>
       {(nombreAsignatura || nombreProfesor) && (
         <p className="mb-4 text-muted">
-          Clase: {nombreAsignatura || 'Desconocida'} - Profesor: {nombreProfesor || 'Desconocido'}
+          Asignatura: {nombreAsignatura || 'Desconocida'} - Profesor: {nombreProfesor || 'Desconocido'}
         </p>
       )}
 

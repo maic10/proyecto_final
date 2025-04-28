@@ -170,7 +170,7 @@ const GestionarHorarios: React.FC = () => {
                   tabIndex={0}
                   style={{ cursor: 'pointer' }}
                 >
-                  Clase: {getNombreAsignatura(clase.id_asignatura)} - Profesor: {getNombreProfesor(clase.id_usuario)}
+                  Asignatura: {getNombreAsignatura(clase.id_asignatura)} - Profesor: {getNombreProfesor(clase.id_usuario)}
                 </li>
               ))}
             </ul>
