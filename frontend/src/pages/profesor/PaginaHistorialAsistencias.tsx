@@ -183,7 +183,7 @@ function PaginaHistorialAsistencias() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4">Historial de Asistencias</h2>
+      <h2 className="display-6 fw-bold text-primary mb-2">Historial de Asistencias</h2>
 
       {/* Filtros */}
       <div className="card p-3 mb-3">

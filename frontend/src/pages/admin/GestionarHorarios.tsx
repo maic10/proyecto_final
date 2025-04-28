@@ -88,7 +88,7 @@ const GestionarHorarios: React.FC = () => {
 
   return (
     <div className="container py-5">
-      <h2 className="mb-4">Gestión de Horarios</h2>
+      <h1 className="display-6 fw-bold text-primary mb-2">Gestión de Horarios</h1>
 
       {error && (
         <div className="alert alert-danger" role="alert" aria-live="assertive">

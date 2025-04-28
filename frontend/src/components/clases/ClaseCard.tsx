@@ -1,4 +1,4 @@
-// src/componente/ClaseCard.tsx
+// src/components/ClaseCard.tsx
 import React from 'react';
 
 interface Horario {
@@ -24,9 +24,8 @@ const ClaseCard: React.FC<ClaseCardProps> = ({ nombreAsignatura, horarios }) => 
       }}
     >
       <div
-        className="card-header text-white text-center"
+        className="card-header text-white text-center bg-primary"
         style={{
-          backgroundColor: '#007bff',
           borderTopLeftRadius: '15px',
           borderTopRightRadius: '15px',
         }}

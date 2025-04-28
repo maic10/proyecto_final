@@ -268,9 +268,11 @@ const PaginaTransmision: React.FC = () => {
 
   return (
     <div className="container py-4">
-      {/* Encabezado con estilo Bootstrap mejorado */}
-      <div className="bg-primary text-white p-4 rounded shadow mb-4">
-        <h2 className="mb-0">Transmisión en Tiempo Real {nombreClase ? `- ${nombreClase}` : ''}</h2>
+      {/* Encabezado con estiloBootstrap mejorado */}
+      <div className="bg-light p-4 rounded shadow mb-4">
+        <h2 className="display-6 fw-bold text-primary mb-0">
+          Transmisión en Tiempo Real {nombreClase ? `- ${nombreClase}` : ''}
+        </h2>
       </div>
 
       {error && <div className="alert alert-danger alert-dismissible fade show" role="alert">{error}</div>}
@@ -281,8 +283,10 @@ const PaginaTransmision: React.FC = () => {
           {/* Sección de video */}
           <div className="card shadow mb-4">
             <div className="card-body">
+              <div className="bg-light p-4 rounded shadow mb-4">
+                <h4 className="display-6 fw-bold text-primary mb-0">Video en Tiempo Real</h4>
+              </div>
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="card-title mb-0">Video en Tiempo Real</h4>
                 {hayTransmision && (
                   <button
                     className="btn btn-outline-primary btn-sm"
@@ -314,7 +318,9 @@ const PaginaTransmision: React.FC = () => {
           {hayTransmision && (
             <div className="card shadow mb-4">
               <div className="card-body">
-                <h4 className="card-title mb-3">Ajustar Tiempo Máximo para Detecciones a Tiempo</h4>
+                <div className="bg-light p-4 rounded shadow mb-4">
+                  <h4 className="display-6 fw-bold text-primary mb-0">Ajustar Tiempo Máximo para Detecciones a Tiempo</h4>
+                </div>
                 {puedeAjustar ? (
                   <div className="d-flex align-items-center">
                     <input
@@ -345,7 +351,9 @@ const PaginaTransmision: React.FC = () => {
           {/* Sección de asistencias */}
           <div className="card shadow">
             <div className="card-body">
-              <h4 className="card-title mb-3">Asistencias en Tiempo Real</h4>
+              <div className="bg-light p-4 rounded shadow mb-4">
+                <h4 className="display-6 fw-bold text-primary mb-0">Asistencias en Tiempo Real</h4>
+              </div>
               {registros.length === 0 ? (
                 <p className="text-muted text-center">No hay asistencias registradas para esta clase y fecha.</p>
               ) : (

@@ -279,7 +279,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
   return (
     <div className="container py-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="mb-0">Gestión de Estudiantes</h2>
+        <h1 className="display-6 fw-bold text-primary mb-2">Gestión de Estudiantes</h1>
         <button
           className="btn btn-primary"
           onClick={() => navigate('/admin/estudiantes/crear')}

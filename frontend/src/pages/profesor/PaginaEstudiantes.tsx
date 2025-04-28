@@ -207,7 +207,7 @@ function PaginaEstudiantes() {
         <>
           <div className="row mb-5 align-items-center">
             <div className="col-12">
-              <h1 className="display-5 fw-bold text-primary mb-2">
+              <h1 className="display-6 fw-bold text-primary mb-2">
                 <i className="bi bi-book me-2"></i>Tus Clases
               </h1>
               <p className="lead text-muted">
