@@ -29,9 +29,7 @@ const PaginaTransmision: React.FC = () => {
   const [mostrarVideo, setMostrarVideo] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-
-  // Estado para mostrar/ocultar la explicación de tardanza
-  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [showInfo, setShowInfo] = useState<boolean>(false); // Estado para mostrar/ocultar explicación
 
   // Cargar clases y determinar la clase activa o más próxima
   useEffect(() => {
@@ -60,7 +58,7 @@ const PaginaTransmision: React.FC = () => {
         let claseActiva: Clase | null = null;
         let claseMasProxima: Clase | null = null;
         let fechaInicioMasProxima: Date | null = null;
-        let aulaSeleccionada = ''; // <-- variable temporal para la aula
+        let aulaSeleccionada = ''; // <-- variable temporal para el aula
 
         // Buscar clase activa hoy
         for (const clase of clasesData) {
@@ -114,7 +112,7 @@ const PaginaTransmision: React.FC = () => {
         if (claseSeleccionada) {
           setIdClase(claseSeleccionada.id_clase);
           setNombreClase(claseSeleccionada.nombre_asignatura);
-          setNombreAula(aulaSeleccionada); // <-- guardamos finalmente el nombre del aula
+          setNombreAula(aulaSeleccionada); // <-- guardamos nombre del aula
 
           const estuds = await obtenerEstudiantes(claseSeleccionada.id_clase);
           setEstudiantes(estuds);
@@ -158,9 +156,7 @@ const PaginaTransmision: React.FC = () => {
   };
 
   useEffect(() => {
-    if (idClase) {
-      cargarDatosTransmision();
-    }
+    if (idClase) cargarDatosTransmision();
   }, [idClase]);
 
   // Actualizar asistencias solo cuando hay transmisión
@@ -178,23 +174,34 @@ const PaginaTransmision: React.FC = () => {
     }
   }, [idClase, hayTransmision]);
 
-  // Verificar estado de transmisión periódicamente
+  // Verificar estado de transmisión cada 5 segundos
   useEffect(() => {
-    if (idClase) {
-      const intervalo = setInterval(async () => {
-        try {
-          const estado = await verificarEstadoTransmision(idClase);
-          setHayTransmision(estado.transmitir);
-          if (!estado.transmitir) setRegistros([]);
-        } catch (err) {
-          console.error('Error al verificar estado de transmisión:', err);
-          setHayTransmision(false);
+    if (!idClase) return;
+    const intervalo = setInterval(async () => {
+      try {
+        const estado = await verificarEstadoTransmision(idClase);
+        setHayTransmision(estado.transmitir);
+        if (!estado.transmitir) {
           setRegistros([]);
+          setMostrarVideo(false);
         }
-      }, 10000);
-      return () => clearInterval(intervalo);
-    }
+      } catch (err) {
+        console.error('Error al verificar estado de transmisión:', err);
+        setHayTransmision(false);
+        setRegistros([]);
+        setMostrarVideo(false);
+      }
+    }, 5000);
+    return () => clearInterval(intervalo);
   }, [idClase]);
+
+  // Cuando la transmisión termina, limpiamos inmediatamente
+  useEffect(() => {
+    if (!hayTransmision) {
+      setRegistros([]);
+      setMostrarVideo(false);
+    }
+  }, [hayTransmision]);
 
   // Manejar corrección manual de estado
   const handleCorregirEstado = async (idEstudiante: string, nuevoEstado: string) => {
@@ -226,8 +233,8 @@ const PaginaTransmision: React.FC = () => {
       <div className="bg-light p-4 rounded shadow mb-4">
         <h2 className="display-6 fw-bold text-primary mb-0">
           Transmisión en Tiempo Real
-          {nombreClase ? ` - ${nombreClase}` : ''}
-          {nombreAula   ? ` (Aula: ${nombreAula})`  : ''}
+          {hayTransmision && nombreClase ? ` - ${nombreClase}` : ''}
+          {hayTransmision && nombreAula ? ` (Aula: ${nombreAula})` : ''}
         </h2>
       </div>
 
@@ -271,7 +278,9 @@ const PaginaTransmision: React.FC = () => {
                   </p>
                 )
               ) : (
-                <p className="text-muted text-center">No hay transmisión activa en este momento.</p>
+                <p className="text-muted text-center">
+                  No hay transmisión activa en este momento.
+                </p>
               )}
             </div>
           </div>
@@ -279,7 +288,7 @@ const PaginaTransmision: React.FC = () => {
           {/* Sección de asistencias */}
           <div className="card shadow">
             <div className="card-body">
-              <div className="bg-light p-4 rounded shadow mb-4">  
+              <div className="bg-light p-4 rounded shadow mb-4">
                 <h4 className="display-6 fw-bold text-primary mb-0">
                   Asistencias en Tiempo Real{' '}
                   <button
