@@ -18,6 +18,7 @@ import { API_BASE } from '../../utils/constants';
 const PaginaTransmision: React.FC = () => {
   const [idClase, setIdClase] = useState<string | null>(null);
   const [nombreClase, setNombreClase] = useState<string>('');
+  const [nombreAula, setNombreAula] = useState<string>(''); // <-- nuevo estado para el aula
   const [clases, setClases] = useState<Clase[]>([]);
   const fechaActual = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
   const navigate = useNavigate();
@@ -53,59 +54,70 @@ const PaginaTransmision: React.FC = () => {
 
         const ahora = new Date();
         const diaActual = ahora.getDay();
-        const diasSemana = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
-        const horaActual = ahora.getHours()*3600 + ahora.getMinutes()*60 + ahora.getSeconds();
+        const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
 
-        let claseActiva: Clase|null = null;
-        let claseMasProxima: Clase|null = null;
-        let fechaInicioMasProxima: Date|null = null;
+        let claseActiva: Clase | null = null;
+        let claseMasProxima: Clase | null = null;
+        let fechaInicioMasProxima: Date | null = null;
+        let aulaSeleccionada = ''; // <-- variable temporal para la aula
 
+        // Buscar clase activa hoy
         for (const clase of clasesData) {
           for (const horario of clase.horarios) {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
             if (diaHorario !== diaActual) continue;
-            const [hI,mI] = horario.hora_inicio.split(':').map(Number);
-            const [hF,mF] = horario.hora_fin.split(':').map(Number);
-            const inicio = hI*3600 + mI*60;
-            let fin = hF*3600 + mF*60;
-            const cruzaMedianoche = fin < inicio;
+
+            const [horaI, minI] = horario.hora_inicio.split(':').map(Number);
+            const [horaF, minF] = horario.hora_fin.split(':').map(Number);
+            const inicioSeg = horaI * 3600 + minI * 60;
+            let finSeg = horaF * 3600 + minF * 60;
+            const cruzaMedianoche = finSeg < inicioSeg;
             const dentro = cruzaMedianoche
-              ? (horaActual >= inicio || horaActual <= fin)
-              : (inicio <= horaActual && horaActual <= fin);
+              ? (horaActual >= inicioSeg || horaActual <= finSeg)
+              : (inicioSeg <= horaActual && horaActual <= finSeg);
             if (!dentro) continue;
+
             const estado = await verificarEstadoTransmision(clase.id_clase);
             if (estado.transmitir) {
               claseActiva = clase;
+              aulaSeleccionada = horario.nombre_aula; // guardamos aula de este horario
               break;
             }
           }
           if (claseActiva) break;
         }
 
+        // Si no hay transmisión activa, buscar próxima clase
         if (!claseActiva) {
           for (const clase of clasesData) {
             for (const horario of clase.horarios) {
               const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
-              const [h,m] = horario.hora_inicio.split(':').map(Number);
+              const [h, m] = horario.hora_inicio.split(':').map(Number);
               const inicioFecha = new Date(ahora);
-              inicioFecha.setHours(h,m,0,0);
-              let diffDias = (diaHorario - diaActual + 7)%7;
+              inicioFecha.setHours(h, m, 0, 0);
+
+              let diffDias = (diaHorario - diaActual + 7) % 7;
               if (diffDias === 0 && inicioFecha < ahora) diffDias = 7;
               inicioFecha.setDate(inicioFecha.getDate() + diffDias);
+
               if (!fechaInicioMasProxima || inicioFecha < fechaInicioMasProxima) {
                 fechaInicioMasProxima = inicioFecha;
                 claseMasProxima = clase;
+                aulaSeleccionada = horario.nombre_aula; // guardamos aula para próxima clase
               }
             }
           }
         }
 
-        const seleccion = claseActiva || claseMasProxima;
-        if (seleccion) {
-          setIdClase(seleccion.id_clase);
-          setNombreClase(seleccion.nombre_asignatura);
-          const estud = await obtenerEstudiantes(seleccion.id_clase);
-          setEstudiantes(estud);
+        const claseSeleccionada = claseActiva || claseMasProxima;
+        if (claseSeleccionada) {
+          setIdClase(claseSeleccionada.id_clase);
+          setNombreClase(claseSeleccionada.nombre_asignatura);
+          setNombreAula(aulaSeleccionada); // <-- guardamos finalmente el nombre del aula
+
+          const estuds = await obtenerEstudiantes(claseSeleccionada.id_clase);
+          setEstudiantes(estuds);
         } else {
           setError('No hay clases próximas programadas.');
           setCargando(false);
@@ -146,37 +158,42 @@ const PaginaTransmision: React.FC = () => {
   };
 
   useEffect(() => {
-    if (idClase) cargarDatosTransmision();
+    if (idClase) {
+      cargarDatosTransmision();
+    }
   }, [idClase]);
 
   // Actualizar asistencias solo cuando hay transmisión
   useEffect(() => {
-    if (!idClase || !hayTransmision) return;
-    const iv = setInterval(async () => {
-      try {
-        const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
-        setRegistros(asistencia.registros || []);
-      } catch (e) {
-        console.error('Error al actualizar asistencias:', e);
-      }
-    }, 5000);
-    return () => clearInterval(iv);
+    if (idClase && hayTransmision) {
+      const intervalo = setInterval(async () => {
+        try {
+          const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
+          setRegistros(asistencia.registros || []);
+        } catch (err) {
+          console.error('Error al actualizar asistencias:', err);
+        }
+      }, 5000);
+      return () => clearInterval(intervalo);
+    }
   }, [idClase, hayTransmision]);
 
   // Verificar estado de transmisión periódicamente
   useEffect(() => {
-    if (!idClase) return;
-    const iv = setInterval(async () => {
-      try {
-        const estado = await verificarEstadoTransmision(idClase);
-        setHayTransmision(estado.transmitir);
-        if (!estado.transmitir) setRegistros([]);
-      } catch {
-        setHayTransmision(false);
-        setRegistros([]);
-      }
-    }, 10000);
-    return () => clearInterval(iv);
+    if (idClase) {
+      const intervalo = setInterval(async () => {
+        try {
+          const estado = await verificarEstadoTransmision(idClase);
+          setHayTransmision(estado.transmitir);
+          if (!estado.transmitir) setRegistros([]);
+        } catch (err) {
+          console.error('Error al verificar estado de transmisión:', err);
+          setHayTransmision(false);
+          setRegistros([]);
+        }
+      }, 10000);
+      return () => clearInterval(intervalo);
+    }
   }, [idClase]);
 
   // Manejar corrección manual de estado
@@ -193,12 +210,12 @@ const PaginaTransmision: React.FC = () => {
 
   // Obtener nombre completo del estudiante
   const obtenerNombreEstudiante = (idEstudiante: string) => {
-    const e = estudiantes.find(x => x.id_estudiante === idEstudiante);
+    const e = estudiantes.find((x) => x.id_estudiante === idEstudiante);
     return e ? `${e.nombre} ${e.apellido}` : idEstudiante;
   };
 
   // Formatear fecha de detección
-  const formatearFechaDeteccion = (fecha: string|null) => {
+  const formatearFechaDeteccion = (fecha: string | null) => {
     if (!fecha) return 'N/A';
     return formatInTimeZone(new Date(fecha), 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
   };
@@ -208,7 +225,9 @@ const PaginaTransmision: React.FC = () => {
       {/* Encabezado con estiloBootstrap mejorado */}
       <div className="bg-light p-4 rounded shadow mb-4">
         <h2 className="display-6 fw-bold text-primary mb-0">
-          Transmisión en Tiempo Real {nombreClase ? `- ${nombreClase}` : ''}
+          Transmisión en Tiempo Real
+          {nombreClase ? ` - ${nombreClase}` : ''}
+          {nombreAula   ? ` (Aula: ${nombreAula})`  : ''}
         </h2>
       </div>
 
@@ -260,7 +279,7 @@ const PaginaTransmision: React.FC = () => {
           {/* Sección de asistencias */}
           <div className="card shadow">
             <div className="card-body">
-              <div className="bg-light p-4 rounded shadow mb-4">
+              <div className="bg-light p-4 rounded shadow mb-4">  
                 <h4 className="display-6 fw-bold text-primary mb-0">
                   Asistencias en Tiempo Real{' '}
                   <button
@@ -274,7 +293,6 @@ const PaginaTransmision: React.FC = () => {
                 </h4>
               </div>
 
-              {/* Explicación de tardanza */}
               {showInfo && (
                 <p className="text-muted small mb-3">
                   Las detecciones que lleguen después de 10 minutos desde el inicio se marcarán automáticamente como <strong>"Tarde"</strong>.
