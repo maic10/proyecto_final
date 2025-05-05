@@ -147,7 +147,7 @@ export const actualizarEstadoAsistencia = async (
 
 export async function verificarEstadoTransmision(idClase: string) {
   const params = { id_clase: idClase };
-  const res = await axiosInstance.get('/estado_web', { params });
+  const res = await axiosInstance.get('/transmision/estado_web', { params });
   return res;
 }
 

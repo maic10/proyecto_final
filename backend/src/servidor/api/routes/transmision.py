@@ -137,7 +137,7 @@ class IniciarTransmision(Resource):
 class EstadoTransmision(Resource):
     @raspberry_token_required
     def post(self):
-        """Verifica el estado de la transmisión y detiene si la clase conocida ya no está activa."""
+        """Verifica el estado de la transmisión y detiene si la clase asociada al aula ya no está activa."""
         data = request.get_json()
         if not data or "id_raspberry_pi" not in data:
             #logger.error("Falta 'id_raspberry_pi' en el cuerpo JSON")
@@ -204,7 +204,8 @@ class EstadoTransmision(Resource):
         # Si no hay transmisión activa, no intentamos buscar una clase activa
         #logger.info(f"No hay transmisión activa para aula {id_aula} y RPI {id_rpi}")
         return {"transmitir": False, "motivo": "No hay transmisión activa"}, 200
-@ns.route("/estado_web")
+    
+@ns.route("/transmision/estado_web")
 class EstadoTransmisionWeb(Resource):
     @jwt_required()
     @ns.doc(params={"id_clase": "ID de la clase"})
