@@ -2,7 +2,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
-import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantes, ajustarTiempoMaximo } from '../../state/api';
+import {
+  obtenerClases,
+  obtenerAsistenciasActual,
+  actualizarEstadoAsistencia,
+  verificarEstadoTransmision,
+  obtenerEstudiantes
+} from '../../state/api';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Clase, Horario } from '../../types/clases';
 import { Estudiante } from '../../types/estudiantes';
@@ -23,10 +29,8 @@ const PaginaTransmision: React.FC = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
-  // Estado para el ajuste del tiempo máximo
-  const [tiempoMaximo, setTiempoMaximo] = useState<number>(10); // Valor por defecto: 10 minutos
-  const [puedeAjustar, setPuedeAjustar] = useState<boolean>(true); // Controla si el ajuste es posible
-  const [tiempoInicio, setTiempoInicio] = useState<number | null>(null); // Tiempo de inicio de la transmisión
+  // Estado para mostrar/ocultar la explicación de tardanza
+  const [showInfo, setShowInfo] = useState<boolean>(false);
 
   // Cargar clases y determinar la clase activa o más próxima
   useEffect(() => {
@@ -49,40 +53,30 @@ const PaginaTransmision: React.FC = () => {
 
         const ahora = new Date();
         const diaActual = ahora.getDay();
-        const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
+        const diasSemana = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+        const horaActual = ahora.getHours()*3600 + ahora.getMinutes()*60 + ahora.getSeconds();
 
-        let claseActiva: Clase | null = null;
-        let claseMasProxima: Clase | null = null;
-        let fechaInicioMasProxima: Date | null = null;
+        let claseActiva: Clase|null = null;
+        let claseMasProxima: Clase|null = null;
+        let fechaInicioMasProxima: Date|null = null;
 
         for (const clase of clasesData) {
           for (const horario of clase.horarios) {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
             if (diaHorario !== diaActual) continue;
-
-            const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
-            const [horaFin, minutosFin] = horario.hora_fin.split(':').map(Number);
-            const inicioSegundos = horaInicio * 3600 + minutosInicio * 60;
-            let finSegundos = horaFin * 3600 + minutosFin * 60;
-
-            const cruzaMedianoche = finSegundos < inicioSegundos;
-            if (cruzaMedianoche) {
-              if (horaActual >= inicioSegundos || horaActual <= finSegundos) {
-                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
-                if (estadoTransmision.transmitir) {
-                  claseActiva = clase;
-                  break;
-                }
-              }
-            } else {
-              if (inicioSegundos <= horaActual && horaActual <= finSegundos) {
-                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
-                if (estadoTransmision.transmitir) {
-                  claseActiva = clase;
-                  break;
-                }
-              }
+            const [hI,mI] = horario.hora_inicio.split(':').map(Number);
+            const [hF,mF] = horario.hora_fin.split(':').map(Number);
+            const inicio = hI*3600 + mI*60;
+            let fin = hF*3600 + mF*60;
+            const cruzaMedianoche = fin < inicio;
+            const dentro = cruzaMedianoche
+              ? (horaActual >= inicio || horaActual <= fin)
+              : (inicio <= horaActual && horaActual <= fin);
+            if (!dentro) continue;
+            const estado = await verificarEstadoTransmision(clase.id_clase);
+            if (estado.transmitir) {
+              claseActiva = clase;
+              break;
             }
           }
           if (claseActiva) break;
@@ -92,32 +86,26 @@ const PaginaTransmision: React.FC = () => {
           for (const clase of clasesData) {
             for (const horario of clase.horarios) {
               const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
-              const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
-              const fechaInicio = new Date(ahora);
-              fechaInicio.setHours(hora, minutos, 0, 0);
-
-              const diasDiferencia = (diaHorario - diaActual + 7) % 7;
-              if (diasDiferencia === 0 && fechaInicio < ahora) {
-                fechaInicio.setDate(fechaInicio.getDate() + 7);
-              } else {
-                fechaInicio.setDate(fechaInicio.getDate() + diasDiferencia);
-              }
-
-              if (!fechaInicioMasProxima || fechaInicio < fechaInicioMasProxima) {
-                fechaInicioMasProxima = fechaInicio;
+              const [h,m] = horario.hora_inicio.split(':').map(Number);
+              const inicioFecha = new Date(ahora);
+              inicioFecha.setHours(h,m,0,0);
+              let diffDias = (diaHorario - diaActual + 7)%7;
+              if (diffDias === 0 && inicioFecha < ahora) diffDias = 7;
+              inicioFecha.setDate(inicioFecha.getDate() + diffDias);
+              if (!fechaInicioMasProxima || inicioFecha < fechaInicioMasProxima) {
+                fechaInicioMasProxima = inicioFecha;
                 claseMasProxima = clase;
               }
             }
           }
         }
 
-        const claseSeleccionada = claseActiva || claseMasProxima;
-        if (claseSeleccionada) {
-          setIdClase(claseSeleccionada.id_clase);
-          setNombreClase(claseSeleccionada.nombre_asignatura);
-
-          const estudiantesData = await obtenerEstudiantes(claseSeleccionada.id_clase);
-          setEstudiantes(estudiantesData);
+        const seleccion = claseActiva || claseMasProxima;
+        if (seleccion) {
+          setIdClase(seleccion.id_clase);
+          setNombreClase(seleccion.nombre_asignatura);
+          const estud = await obtenerEstudiantes(seleccion.id_clase);
+          setEstudiantes(estud);
         } else {
           setError('No hay clases próximas programadas.');
           setCargando(false);
@@ -139,17 +127,15 @@ const PaginaTransmision: React.FC = () => {
     setCargando(true);
     setError('');
     try {
-      const estadoTransmision = await verificarEstadoTransmision(idClase);
-      setHayTransmision(estadoTransmision.transmitir);
-      setMostrarVideo(estadoTransmision.transmitir);
+      const estado = await verificarEstadoTransmision(idClase);
+      setHayTransmision(estado.transmitir);
+      setMostrarVideo(estado.transmitir);
 
-      if (estadoTransmision.transmitir) {
-        setTiempoInicio(Date.now());
+      if (estado.transmitir) {
         const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
         setRegistros(asistencia.registros || []);
       } else {
         setRegistros([]);
-        setTiempoInicio(null);
       }
     } catch (err) {
       console.error('Error al cargar datos de transmisión:', err);
@@ -160,110 +146,61 @@ const PaginaTransmision: React.FC = () => {
   };
 
   useEffect(() => {
-    if (idClase) {
-      cargarDatosTransmision();
-    }
+    if (idClase) cargarDatosTransmision();
   }, [idClase]);
 
   // Actualizar asistencias solo cuando hay transmisión
   useEffect(() => {
-    if (idClase && hayTransmision) {
-      const intervalAsistencias = setInterval(async () => {
-        try {
-          const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
-          setRegistros(asistencia.registros || []);
-        } catch (err) {
-          console.error('Error al actualizar asistencias:', err);
-        }
-      }, 5000);
-
-      return () => clearInterval(intervalAsistencias);
-    }
+    if (!idClase || !hayTransmision) return;
+    const iv = setInterval(async () => {
+      try {
+        const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
+        setRegistros(asistencia.registros || []);
+      } catch (e) {
+        console.error('Error al actualizar asistencias:', e);
+      }
+    }, 5000);
+    return () => clearInterval(iv);
   }, [idClase, hayTransmision]);
 
   // Verificar estado de transmisión periódicamente
   useEffect(() => {
-    if (idClase) {
-      const intervalTransmision = setInterval(async () => {
-        try {
-          const estadoTransmision = await verificarEstadoTransmision(idClase);
-          setHayTransmision(estadoTransmision.transmitir);
-          if (!estadoTransmision.transmitir) {
-            setRegistros([]);
-            setTiempoInicio(null);
-          }
-        } catch (err) {
-          console.error('Error al verificar estado de transmisión:', err);
-          setHayTransmision(false);
-          setRegistros([]);
-          setTiempoInicio(null);
-        }
-      }, 10000);
-
-      return () => clearInterval(intervalTransmision);
-    }
+    if (!idClase) return;
+    const iv = setInterval(async () => {
+      try {
+        const estado = await verificarEstadoTransmision(idClase);
+        setHayTransmision(estado.transmitir);
+        if (!estado.transmitir) setRegistros([]);
+      } catch {
+        setHayTransmision(false);
+        setRegistros([]);
+      }
+    }, 10000);
+    return () => clearInterval(iv);
   }, [idClase]);
 
-  // Controlar si el ajuste del tiempo máximo es posible (primeros 5 minutos)
-  useEffect(() => {
-    if (hayTransmision && tiempoInicio) {
-      const interval = setInterval(() => {
-        const tiempoTranscurrido = (Date.now() - tiempoInicio) / 1000; // En segundos
-        if (tiempoTranscurrido > 300) { // 5 minutos = 300 segundos
-          setPuedeAjustar(false);
-          clearInterval(interval);
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [hayTransmision, tiempoInicio]);
-
-  // Manejar el cambio del tiempo máximo
-  const handleAjustarTiempoMaximo = async () => {
-    if (!idClase || !puedeAjustar) return;
-
-    const tiempoMaximoNum = Number(tiempoMaximo);
-    if (isNaN(tiempoMaximoNum) || tiempoMaximoNum <= 0) {
-      setError('El tiempo máximo debe ser un número positivo');
-      return;
-    }
-
-    try {
-      const response = await ajustarTiempoMaximo(idClase, tiempoMaximoNum);
-      console.log('Tiempo máximo ajustado:', response);
-      setError('');
-    } catch (err) {
-      console.error('Error al ajustar tiempo máximo:', err);
-      setError('Error al ajustar el tiempo máximo: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  // Manejar cambio de estado
+  // Manejar corrección manual de estado
   const handleCorregirEstado = async (idEstudiante: string, nuevoEstado: string) => {
     if (!idClase) return;
-
     try {
       await actualizarEstadoAsistencia(idEstudiante, idClase, fechaActual, nuevoEstado);
       const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
       setRegistros(asistencia.registros || []);
-    } catch (err) {
-      console.error('Error al actualizar estado:', err);
+    } catch {
       alert('Error al actualizar el estado del estudiante');
     }
   };
 
   // Obtener nombre completo del estudiante
   const obtenerNombreEstudiante = (idEstudiante: string) => {
-    const estudiante = estudiantes.find((e) => e.id_estudiante === idEstudiante);
-    return estudiante ? `${estudiante.nombre} ${estudiante.apellido}` : idEstudiante;
+    const e = estudiantes.find(x => x.id_estudiante === idEstudiante);
+    return e ? `${e.nombre} ${e.apellido}` : idEstudiante;
   };
 
-  // Formatear fecha_deteccion a un formato legible
-  const formatearFechaDeteccion = (fecha: string | null) => {
+  // Formatear fecha de detección
+  const formatearFechaDeteccion = (fecha: string|null) => {
     if (!fecha) return 'N/A';
-    const fechaObj = new Date(fecha);
-    return formatInTimeZone(fechaObj, 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
+    return formatInTimeZone(new Date(fecha), 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
   };
 
   return (
@@ -275,7 +212,11 @@ const PaginaTransmision: React.FC = () => {
         </h2>
       </div>
 
-      {error && <div className="alert alert-danger alert-dismissible fade show" role="alert">{error}</div>}
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          {error}
+        </div>
+      )}
       {cargando && <p className="text-muted text-center">Cargando datos...</p>}
 
       {!cargando && idClase && (
@@ -306,7 +247,9 @@ const PaginaTransmision: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <p className="text-muted text-center">Video oculto para optimizar el rendimiento. Haz clic en "Mostrar Video" para verlo.</p>
+                  <p className="text-muted text-center">
+                    Video oculto para optimizar el rendimiento. Haz clic en "Mostrar Video" para verlo.
+                  </p>
                 )
               ) : (
                 <p className="text-muted text-center">No hay transmisión activa en este momento.</p>
@@ -314,48 +257,34 @@ const PaginaTransmision: React.FC = () => {
             </div>
           </div>
 
-          {/* Sección para ajustar el tiempo máximo */}
-          {hayTransmision && (
-            <div className="card shadow mb-4">
-              <div className="card-body">
-                <div className="bg-light p-4 rounded shadow mb-4">
-                  <h4 className="display-6 fw-bold text-primary mb-0">Ajustar Tiempo Máximo para Detecciones a Tiempo</h4>
-                </div>
-                {puedeAjustar ? (
-                  <div className="d-flex align-items-center">
-                    <input
-                      type="number"
-                      className="form-control me-2"
-                      value={tiempoMaximo}
-                      onChange={(e) => setTiempoMaximo(Number(e.target.value))}
-                      min="1"
-                      step="1"
-                      required
-                      style={{ width: '100px' }}
-                    />
-                    <span className="me-2">minutos</span>
-                    <button
-                      className="btn btn-success"
-                      onClick={handleAjustarTiempoMaximo}
-                    >
-                      Ajustar
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-muted">El tiempo máximo solo puede ajustarse en los primeros 5 minutos de la clase.</p>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Sección de asistencias */}
           <div className="card shadow">
             <div className="card-body">
               <div className="bg-light p-4 rounded shadow mb-4">
-                <h4 className="display-6 fw-bold text-primary mb-0">Asistencias en Tiempo Real</h4>
+                <h4 className="display-6 fw-bold text-primary mb-0">
+                  Asistencias en Tiempo Real{' '}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 align-baseline"
+                    style={{ fontSize: '1.2rem' }}
+                    onClick={() => setShowInfo(!showInfo)}
+                  >
+                    ℹ️
+                  </button>
+                </h4>
               </div>
+
+              {/* Explicación de tardanza */}
+              {showInfo && (
+                <p className="text-muted small mb-3">
+                  Las detecciones que lleguen después de 10 minutos desde el inicio se marcarán automáticamente como <strong>"Tarde"</strong>.
+                </p>
+              )}
+
               {registros.length === 0 ? (
-                <p className="text-muted text-center">No hay asistencias registradas para esta clase y fecha.</p>
+                <p className="text-muted text-center">
+                  No hay asistencias registradas para esta clase y fecha.
+                </p>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-striped table-bordered table-hover">
@@ -374,12 +303,20 @@ const PaginaTransmision: React.FC = () => {
                         <tr key={registro.id_estudiante}>
                           <td>{obtenerNombreEstudiante(registro.id_estudiante)}</td>
                           <td>
-                            <span className={`badge ${
-                              registro.estado === "confirmado" ? "bg-success" :
-                              registro.estado === "tarde" ? "bg-warning" :
-                              "bg-danger"
-                            }`}>
-                              {registro.estado === "confirmado" ? "Confirmado" : registro.estado === "tarde" ? "Tarde" : "Ausente"}
+                            <span
+                              className={`badge ${
+                                registro.estado === 'confirmado'
+                                  ? 'bg-success'
+                                  : registro.estado === 'tarde'
+                                  ? 'bg-warning'
+                                  : 'bg-danger'
+                              }`}
+                            >
+                              {registro.estado === 'confirmado'
+                                ? 'Confirmado'
+                                : registro.estado === 'tarde'
+                                ? 'Tarde'
+                                : 'Ausente'}
                             </span>
                           </td>
                           <td>{formatearFechaDeteccion(registro.fecha_deteccion)}</td>
@@ -388,7 +325,9 @@ const PaginaTransmision: React.FC = () => {
                           <td>
                             <select
                               value={registro.estado}
-                              onChange={(e) => handleCorregirEstado(registro.id_estudiante, e.target.value)}
+                              onChange={(e) =>
+                                handleCorregirEstado(registro.id_estudiante, e.target.value)
+                              }
                               className="form-select form-select-sm"
                             >
                               <option value="confirmado">Confirmado</option>
