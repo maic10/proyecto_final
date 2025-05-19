@@ -8,9 +8,18 @@ from flask_restx import Resource
 from src.servidor.api import ns
 
 def generate_raspberry_token(raspberry_id):
+    """
+    Genera un token JWT para una Raspberry Pi usando su ID.
+    :param raspberry_id: ID único de la Raspberry Pi
+    :return: Token JWT como string
+    """    
     return jwt.encode({"id": raspberry_id}, JWT_SECRET_KEY, algorithm="HS256")
 
 def raspberry_token_required(f):
+    """
+    Decorador para proteger endpoints que requieren autenticación de Raspberry Pi.
+    Verifica el token JWT y que la Raspberry esté registrada en la base de datos.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -33,6 +42,10 @@ def raspberry_token_required(f):
 @ns.route("/auth/raspberry")
 class RaspberryAuth(Resource):
     def post(self):
+        """
+        Endpoint para autenticar una Raspberry Pi y devolver un token JWT.
+        Requiere el parámetro 'id_raspberry_pi' en el cuerpo JSON.
+        """
         data = request.get_json()
         id_rpi = data.get("id_raspberry_pi")
         if not id_rpi:

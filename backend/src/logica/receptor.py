@@ -1,4 +1,3 @@
-# src/servidor/video/receptor.py
 import cv2
 import subprocess
 import numpy as np
@@ -13,11 +12,11 @@ from src.logica.utils import (
 )
 
 # Constantes de configuración
-MODO_LOCAL = True
-MODO_LOCAL_CAMARA = False
-VIDEO_TEST_PATH = r"C:/Users/maic1/Documents/tfg/proyecto_final/backend/src/recursos/video/clase_2.mp4"
+MODO_LOCAL = False  # Cambiar a True para pruebas locales
+MODO_LOCAL_CAMARA = False   # Cambiar a True para usar la cámara local
+VIDEO_TEST_PATH = r"PATH/AL/VIDEO_TEST.mp4"  # Cambiar a la ruta del video de prueba
 INTERVALO_REGISTRO_ASISTENCIA = 10  # Intervalo para registrar asistencias (segundos)
-TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos en segundos
+TIEMPO_MAXIMO_DETECCION_DEFAULT = 10 * 60  # 10 minutos
 
 def _log_ffmpeg_stderr(process):
     """Registra los mensajes de error de FFmpeg en un hilo separado."""
@@ -60,7 +59,7 @@ def detener_transmision(transmision_or_id_aula):
         transmision["detecciones_temporales"].clear()
     if transmision.get("proceso_ffmpeg"):
         transmision["proceso_ffmpeg"].terminate()
-        transmision["proceso_ffmpeg"].wait()  # Asegurar que el proceso FFmpeg termine
+        transmision["proceso_ffmpeg"].wait()  
     logger.info(f"Transmisión detenida para aula asociada a clase {transmision['id_clase']}")
     cv2.destroyAllWindows()
 
@@ -81,7 +80,7 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
     logger.debug(f"Evento detener inicializado para aula {id_aula} con clase {id_clase}")
 
     # --- Ajusta aquí el ancho y alto según la resolución que envíe la RPI ---
-    width, height =  960, 540# 640 , 480 # 640, 480  #1920, 1080   
+    width, height =  960, 540
     embeddings_dict = cargar_embeddings_por_clase(id_clase)
     tracker = FaceTracker(embeddings_dict=embeddings_dict,frame_rate=30,detect_every_n = 3)
 
@@ -92,6 +91,7 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
             logger.error("No se pudo abrir la fuente de video local")
             detener_transmision(transmision)
             return transmision
+        
         # Obtener FPS real del vídeo y calcular el intervalo entre cuadros
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps <= 0:
@@ -104,7 +104,8 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
             if not ret:
                 logger.error("No se pudo leer un frame de la cámara")
                 break
-
+            
+            # Procesar el frame
             procesado = tracker.process_frame(frame)
 
             with transmision["lock"]:
@@ -142,12 +143,6 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
             if to_sleep > 0:
                 time.sleep(to_sleep)
 
-            #video_pantalla(cv2, id_clase, procesado)
-            # Actualizar la ventana y permitir eventos de teclado
-            #if cv2.waitKey(1) & 0xFF == ord('q'):
-            #    logger.info("Tecla 'q' presionada. Deteniendo la transmisión.")
-            #   transmision["detener_evento"].set()
-
         logger.info("Bucle de recepción terminado")
         cap.release()
         return transmision
@@ -157,10 +152,7 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
         # MODO REMOTO: lectura de stream por FFmpeg
         # -----------------------------------------------
         logger.info("Iniciando recepción de video desde FFmpeg...")
-        """
-        window_name = f"Vista previa - {id_clase}"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)        
-        """
+
         cmd = [
             "ffmpeg",
             "-thread_queue_size", "1024",
@@ -195,15 +187,13 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
 
             # Bucle para leer datos de FFmpeg
             frame_size = width * height * 3  # bytes por frame: W×H×3 canales
-            chunk_size = 64 * 1024   ## 64 * 1024           # leer en trozos de 64 KB  # 256 * 1024   --> 256 KB reduce la sobrecarga de syscalls y puede mejorar el throughput
+            chunk_size = 64 * 1024   
             frame_buffer = bytearray()       # Buffer para acumular datos
 
             while not transmision["detener_evento"].is_set():
                 try:
                     chunk = transmision["proceso_ffmpeg"].stdout.read(chunk_size)
                     if not chunk:
-                        # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                        logger.debug("No se recibieron datos de FFmpeg")
                         continue
                     frame_buffer.extend(chunk)
 
@@ -215,11 +205,8 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
                         # Reconstrucción en array H×W×3 BGR
                         frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
                         frame_procesado =tracker.process_frame(frame)
-                        #frame_procesado = frame
 
                         if frame_procesado is None or not isinstance(frame_procesado, np.ndarray):
-                            # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                            # logger.error(f"Frame procesado no válido: {frame_procesado}")
                             continue
                             
                         with transmision["lock"]:
@@ -250,24 +237,15 @@ def iniciar_transmision_para_aula(id_aula, id_clase, transmisiones_activas, tran
                                         )
                                     transmision["detecciones_temporales"].clear()
                             transmision["ultimo_registro"] = ahora
-                        """
-                        # Mostrar en ventana
-                        cv2.imshow(window_name, frame_procesado)
-                        # Permite refrescar la ventana y capturar 'q' para salir
-                        if cv2.waitKey(1) & 0xFF == ord('q'):
-                            transmision["detener_evento"].set()
-                            break
-                        """
+
                 except Exception:
-                    # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                    # logger.debug(f"Error al leer datos de FFmpeg: {e}")
+                    logger.debug(f"Error al leer datos de FFmpeg: {e}")
                     continue
 
         except Exception as e:
             logger.error(f"No se pudo iniciar FFmpeg: {e}")
             return transmision
         finally:
-            # No llamar a detener_transmision aquí, ya que se llama en EstadoTransmision.post
             pass
 
         return transmision
@@ -278,21 +256,13 @@ def generar_frames(transmision):
     while True:
         with transmision["lock"]:
             if transmision["frame"] is None:
-                # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                # logger.debug("No hay frame disponible para enviar al frontend")
                 time.sleep(0.04)
                 continue
             ret, buffer = cv2.imencode('.jpg', transmision["frame"])
             if not ret:
-                # Logging desactivado por rendimiento; descomentar si es necesario para depuración
-                # logger.error("No se pudo codificar el frame en JPEG")
                 time.sleep(0.04)
                 continue
             frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         time.sleep(0.04)
-
-def video_pantalla(cv2, id_clase, frame_procesado):
-    """Muestra el frame procesado en una ventana local."""
-    cv2.imshow(f"Vista previa - {id_clase}", frame_procesado)

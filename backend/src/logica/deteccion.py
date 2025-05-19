@@ -1,4 +1,3 @@
-# src/logica/deteccion.py
 import cv2
 import numpy as np
 import torch
@@ -47,24 +46,18 @@ class FaceTracker:
 
         # Preprocesar embeddings_dict para vectorización
         if embeddings_dict:
-            # Convertir embeddings a una lista de arrays 1D y validar forma
             embedding_list = []
             self.all_ids = []
             for alumno_id, emb_list in embeddings_dict.items():
-                #logger.info(f"Procesando embeddings para {alumno_id} y {emb_list} embeddings.")
                 for emb in emb_list:
-                    #logger.info(f"Convirtiendo embedding para {alumno_id} con forma {emb}.")
                     emb_array = np.array(emb, dtype=np.float32)
-                    #logger.info(f"Embedding convertido a array: {emb_array}")
-                    # Validar que el embedding sea un array 1D de tamaño 512
-                    if emb_array.ndim == 1 and emb_array.shape[0] == 512:  # Validar dimensión
+                    if emb_array.ndim == 1 and emb_array.shape[0] == 512: 
                         embedding_list.append(emb_array)
                         self.all_ids.append(alumno_id)
                     else:
                         logger.warning(f"Embedding inválido para {alumno_id}: forma {emb_array.shape}, esperado (512,)")
             if embedding_list:
-                # Convertir la lista de embeddings a un array 2D y calcular normas 
-                self.all_stored_embeddings = np.stack(embedding_list)  # Forma (n, 512)
+                self.all_stored_embeddings = np.stack(embedding_list)  
                 self.stored_norms = np.linalg.norm(self.all_stored_embeddings, axis=1)
             else:
                 logger.error("No se encontraron embeddings válidos en embeddings_dict.")
@@ -75,16 +68,16 @@ class FaceTracker:
     def update_fps(self, frame):
         """Calcula y dibuja los FPS en el frame."""
         elapsed_time = time.time() - self.fps_start_time
-        if elapsed_time > 0.5:  # Actualizar cada 0.5s para estabilidad
+        if elapsed_time > 0.5:  
             fps = self.frame_count / elapsed_time
-            self.frame_count = 0  # Reiniciar contador
-            self.fps_start_time = time.time()  # Reiniciar tiempo
+            self.frame_count = 0  
+            self.fps_start_time = time.time() 
         else:
-            fps = self.frame_count / elapsed_time if elapsed_time > 0 else 0.0  # Mostrar valor intermedio
+            fps = self.frame_count / elapsed_time if elapsed_time > 0 else 0.0  
         
         # Dibujar FPS en el frame
-        #cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        cv2.putText(frame, f"FPS: {fps:.2f}", (80, 80), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 0, 0), 3)
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+       
         return frame
 
     def identify_faces(self, faces, tracked_objects):
@@ -95,8 +88,8 @@ class FaceTracker:
             if not faces:
                 logger.info("No se detectaron rostros.")
                 self.identified_faces.clear()
-                self.tracker.reset()  # Reiniciar el contador de IDs de seguimiento
-                #logger.debug("No hay rostros detectados, limpiando tracks.")
+                # Reiniciar el contador de IDs de seguimiento
+                self.tracker.reset()  
             return self.identified_faces
         
         # Mapa de tracks: idx -> track_id
@@ -122,11 +115,9 @@ class FaceTracker:
                     best_similarity = round(float(face_similarities[best_idx]), 4)  # Convertir a float nativo
                     if best_similarity >= self.similarity_threshold:
                         best_match_id = self.all_ids[best_idx]
-                        new_identified[track_id] = (best_match_id, best_similarity)
-                        logger.info(f"Rostro identificado: track_id={track_id}, estudiante={best_match_id}, similitud={best_similarity:.2f}")
+                        new_identified[track_id] = (best_match_id, best_similarity)                        
                     else:
-                        new_identified[track_id] = ("Desconocido", best_similarity)
-                        logger.info(f"Rostro desconocido: track_id={track_id}, mejor similitud={best_similarity:.2f}")
+                        new_identified[track_id] = ("Desconocido", best_similarity)                        
                 else:
                     # Actualizar similitudes solo si el track_id ya existe
                     if track_id in self.identified_faces:
@@ -138,8 +129,6 @@ class FaceTracker:
                         if best_similarity > previous_similarity:                        
                             best_match_id = self.all_ids[best_idx]
                             self.identified_faces[track_id] = (best_match_id, best_similarity)
-                            logger.info(f"Actualizando rostro {track_id}: anterior {previous_identity} con similitud "
-                                        f"{previous_similarity:.2f}, nueva similitud {best_similarity:.2f}")
                            
         # Actualizar solo tracks nuevos o "Desconocido"
         for track_id, identity in new_identified.items():
@@ -167,36 +156,23 @@ class FaceTracker:
                 color = (0, 0, 255)  # Rojo para desconocidos
 
             # Dibujar el rectángulo
-            #cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)  # grosor de línea 1
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 5)  # grosor de línea 1
-
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)  
+           
             # Dibujar círculos pequeños en las esquinas
-            #radius = 1  # Tamaño del círculo
-            radius = 4  # Tamaño del círculo
-            thickness = -1  # -1 para círculo relleno
+            radius = 1  
+            thickness = -1  
             black = (255, 0, 0)  # Color azul
             for (cx, cy) in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
                 cv2.circle(frame, (cx, cy), radius, black, thickness)
 
-            # Preparar y dibujar el texto
-            """ 
-            label = f"ID: {track_id}"
-            if track_id in identified:
-                label += f" - {identified[track_id][0]}"
-            #cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 2.5, color, 3)
-            """
         return frame
 
-
-
     def process_frame(self, frame):
+        """Procesa un frame de video, detectando y rastreando rostros."""
         self.frame_count += 1
 
         # Asegurarse de que el frame sea escribible
-        frame = frame.copy()  
-
-        frame_resized = frame
+        frame_resized = frame.copy()
 
         # Limitar el procesamiento a cada N frames (detect_interval)
         if self.frame_count % self.detect_interval == 0:
@@ -243,19 +219,25 @@ class FaceTracker:
         # Dibujar resultados
         frame_resized = self.draw_tracking_info(frame_resized, face_assignments, identified)
 
-        # Actualizar y dibujar FPS
-        #frame_resized = self.update_fps(frame_resized)
-
         return frame_resized
 
+"""
+    Bloque de prueba interactivo:
+    Permite ejecutar el seguimiento e identificación de rostros usando una cámara web o un video local.
+    - Carga los embeddings faciales desde un directorio de imágenes.
+    - Inicializa el FaceTracker con los embeddings y parámetros configurados.
+    - Permite al usuario elegir entre cámara o archivo de video como fuente.
+    - Procesa cada frame, mostrando en tiempo real el seguimiento e identificación de rostros.
+    - Finaliza al cerrar la ventana o pulsar 'q'.
+"""
 if __name__ == "__main__":
-    VIDEO_PATH = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\video\clase_2.mp4"
-    IMAGES_DIR = r"C:\Users\maic1\Documents\tfg\proyecto_final\backend\src\recursos\imagenes"
+    
+    VIDEO_PATH = r"PATH\TO\VIDEO.mp4"   # Cambia esto a la ruta de tu video
+    IMAGES_DIR = r"PATH\TO\IMAGES"      # Cambia esto a la ruta de tu directorio de imágenes
 
     embeddings_gen = EmbeddingsGenerator(IMAGES_DIR)
     embeddings_dict = embeddings_gen.load_and_generate_embeddings()
-    #logger.info(f"Embeddings generados: {embeddings_dict["perfil"] }")
-    
+
     tracker = FaceTracker(embeddings_dict=embeddings_dict, frame_rate=30, detect_every_n=3)
 
     print("Selecciona la fuente de video:")
@@ -277,19 +259,12 @@ if __name__ == "__main__":
         print("Error: No se pudo abrir la fuente de video.")
         exit()
 
-    # crear ventana redimensionable y mostrar a pantalla completa (o arrástrala)
     cv2.namedWindow("Test - Seguimiento de Rostros", cv2.WINDOW_NORMAL)
-    # Opcional: arrancar en modo pantalla completa
     cv2.setWindowProperty(
       "Test - Seguimiento de Rostros",
       cv2.WND_PROP_FULLSCREEN,
       cv2.WINDOW_FULLSCREEN
     )
-
-    #fps = cap.get(cv2.CAP_PROP_FPS)
-    #if fps <= 0:
-    #    fps = 30  # fallback razonable
-    #delay_ms = int(1000 / fps)
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -298,15 +273,6 @@ if __name__ == "__main__":
             break
 
         processed_frame = tracker.process_frame(frame)
-
-        # redimensionar para mostrar en ventana 640x480 maximo
-        #h, w = processed_frame.shape[:2]
-        #max_w, max_h = 640, 480
-        #scale = min(max_w / w, max_h / h)
-        #display_frame = cv2.resize(
-        #    processed_frame,
-        #    (int(w * scale), int(h * scale))
-        #)
 
         cv2.imshow("Test - Seguimiento de Rostros", processed_frame)
 

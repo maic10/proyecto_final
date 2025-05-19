@@ -14,12 +14,15 @@ class AsignaturasResource(Resource):
     @ns.doc(description="Operaciones relacionadas con asignaturas")
     @ns.marshal_list_with(asignatura_model)  # Usar el modelo para la respuesta
     def get(self):
-        """Lista todas las asignaturas"""
+        """
+        Lista todas las asignaturas.
+        Solo accesible para administradores autenticados.
+        Devuelve una lista de objetos asignatura.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         asignaturas = list(asignaturas_collection.find())
@@ -33,24 +36,25 @@ class ProfesoresPorAsignaturaResource(Resource):
     @ns.doc(description="Obtener los profesores que imparten una asignatura")
     @ns.marshal_list_with(usuario_model)  # Usar el modelo de usuario
     def get(self, id_asignatura):
-        """Lista los profesores que imparten una asignatura específica"""
+        """
+        Lista los profesores que imparten una asignatura específica.
+        Solo accesible para administradores autenticados.
+        Devuelve una lista de objetos usuario con rol 'profesor'.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         # Verificar que la asignatura exista
         asignatura = asignaturas_collection.find_one({"id_asignatura": id_asignatura})
-        if not asignatura:
-            logger.error(f"Asignatura {id_asignatura} no encontrada")
+        if not asignatura:            
             return {"error": "Asignatura no encontrada"}, 404
 
         # Buscar clases que tengan esta asignatura
         clases = list(clases_collection.find({"id_asignatura": id_asignatura}))
-        if not clases:
-            logger.info(f"No se encontraron clases para la asignatura {id_asignatura}")
+        if not clases:            
             return [], 200
 
         # Obtener los IDs de los profesores (usando id_usuario)

@@ -1,6 +1,5 @@
-# src/logica/database.py
 from datetime import datetime
-from src.servidor.api import mongo  # Importamos mongo desde servidor/api/__init__.py
+from src.servidor.api import mongo  
 from gridfs import GridFS
 
 # Usamos mongo.db en lugar de crear una nueva conexión

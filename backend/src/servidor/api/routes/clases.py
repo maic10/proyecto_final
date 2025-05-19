@@ -1,4 +1,3 @@
-# src/servidor/api/routes/clases.py
 from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
@@ -14,14 +13,18 @@ class ClasesResource(Resource):
         "asignatura": "ID de la asignatura (opcional)"
     })
     @jwt_required()
-    @ns.marshal_list_with(clase_model_clases)  # Usamos el nuevo modelo
+    @ns.marshal_list_with(clase_model_clases) 
     def get(self):
-        """Obtener clases filtradas por profesor o asignatura"""
+        """
+        Devuelve una lista de clases filtradas por profesor o asignatura.
+        - Los profesores solo pueden ver sus propias clases o filtrar por asignatura.
+        - Los administradores pueden ver todas las clases.
+        Incluye los horarios y el nombre del aula para cada clase.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
         if not user or (user["rol"] != "profesor" and user["rol"] != "admin"):
-            logger.error(f"Usuario {identity} no tiene permisos")
             return {"error": "Acceso denegado"}, 403
 
         parser = reqparse.RequestParser()
@@ -35,10 +38,8 @@ class ClasesResource(Resource):
         # Validaciones para profesores
         if user["rol"] == "profesor":
             if not id_usuario and not asignatura:
-                # Si es profesor y no se especifica ni id_usuario ni asignatura, usar su propio ID
                 id_usuario = identity
             elif id_usuario and id_usuario != identity:
-                logger.error(f"Profesor {identity} intentó consultar clases de otro usuario: {id_usuario}")
                 return {"error": "No puedes consultar clases de otro profesor"}, 403
 
         # Construir la consulta
@@ -50,12 +51,10 @@ class ClasesResource(Resource):
 
         # Si no se proporciona ningún parámetro y el usuario es admin, devolver todas las clases
         if not query and user["rol"] != "admin":
-            logger.error(f"Profesor {identity} debe especificar al menos un filtro")
             return {"error": "Debes especificar un id_usuario o asignatura"}, 400
 
         clases = list(clases_collection.find(query))
         if not clases:
-            logger.info(f"No se encontraron clases para la consulta: {query}")
             return [], 200
 
         # Obtener todos los nombres de aulas en un solo query
@@ -87,7 +86,6 @@ class ClasesResource(Resource):
                 "horarios": horarios
             })
 
-        #logger.info(f"Respuesta: {response}")
         return response, 200
 
 @ns.route("/clases/<string:id_clase>")
@@ -96,18 +94,19 @@ class ClaseResource(Resource):
     @ns.doc(description="Obtener los detalles de una clase específica (solo para administradores)")
     @ns.marshal_with(clase_model)
     def get(self, id_clase):
-        """Obtener los detalles de una clase específica"""
+        """
+        Devuelve los detalles de una clase específica.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
         if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
             return {"error": "Acceso denegado"}, 403
 
         clase = clases_collection.find_one({"id_clase": id_clase})
         if not clase:
             logger.error(f"Clase {id_clase} no encontrada")
-            return {"error": "Clase no encontrada"}, 404
 
         return {
             "id_clase": clase["id_clase"],
@@ -127,12 +126,15 @@ class ClasesAdminResource(Resource):
     })
     @ns.marshal_list_with(clase_model)
     def get(self):
-        """Obtener clases basadas en asignatura, profesor o ID de clase"""
+        """
+        Devuelve una lista de clases filtradas por asignatura, profesor o ID de clase.
+        Solo accesible para administradores.
+        Si se proporciona id_clase, se ignoran los otros filtros.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
         if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
             return {"error": "Acceso denegado"}, 403
 
         parser = reqparse.RequestParser()

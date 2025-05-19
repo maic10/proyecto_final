@@ -1,10 +1,8 @@
-# src/logica/gridfs_embeddings_generator.py
-
-import cv2  # Biblioteca para manipulación de imágenes
-import numpy as np  # Biblioteca para operaciones con matrices
-import torch  # Biblioteca para operaciones con GPU y aprendizaje profundo
-from insightface.app import FaceAnalysis  # Modelo de análisis facial de InsightFace
-from src.logica.logger import logger  # Logger personalizado para registrar eventos y errores
+import cv2  
+import numpy as np  
+import torch  
+from insightface.app import FaceAnalysis  
+from src.logica.logger import logger  
 
 class GridFSEmbeddingsGenerator:
     def __init__(self, model_name="buffalo_sc"):
@@ -23,7 +21,7 @@ class GridFSEmbeddingsGenerator:
         )
         
         # Prepara el modelo con un tamaño de detección predeterminado
-        self.detector.prepare(ctx_id=0, det_size=(640, 480))
+        self.detector.prepare(ctx_id=0, det_size=(960, 960))
         
         # Registra un mensaje indicando el modelo cargado y el dispositivo utilizado
         logger.info(f"Modelo {model_name} cargado en {self.device} para GridFS.")
@@ -67,7 +65,7 @@ class GridFSEmbeddingsGenerator:
         :param fs: Objeto de GridFS para acceder a las imágenes.
         :return: Lista de embeddings generados.
         """
-        embeddings = []  # Lista para almacenar los embeddings generados
+        embeddings = []  
         
         # Itera sobre los IDs de las imágenes
         for file_id in image_ids:
@@ -79,9 +77,8 @@ class GridFSEmbeddingsGenerator:
                 # Genera el embedding para la imagen
                 embedding = self.process_image_data(image_data)
                 if embedding:
-                    embeddings.append(embedding)  # Agrega el embedding a la lista
+                    embeddings.append(embedding)  
             except Exception as e:
-                # Registra un error si ocurre un problema al procesar una imagen
                 logger.error(f"Error al procesar imagen {file_id}: {e}")
                 continue
         

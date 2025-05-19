@@ -1,5 +1,3 @@
-import numpy as np
-from datetime import datetime
 import pytz
 from .logger import logger
 from src.logica.database import *
@@ -29,9 +27,7 @@ def cargar_embeddings_por_clase(id_clase):
             id_est = est["id_estudiante"]
             embeddings = est.get("embeddings", [])
             embeddings_np = [np.array(e) for e in embeddings]
-            embeddings_dict[id_est] = embeddings_np
-            logger.info(f"Cargado para clase {id_clase}: {id_est} ({len(embeddings_np)} embeddings)")
-        logger.info(f"Total cargados para clase {id_clase}: {len(embeddings_dict)} estudiantes")
+            embeddings_dict[id_est] = embeddings_np                    
     except Exception as e:
         logger.error(f"Error al cargar embeddings para clase {id_clase}: {e}")
     return embeddings_dict
@@ -47,7 +43,6 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio
         tiempo_inicio (float): Tiempo de inicio de la transmisión (timestamp).
         tiempo_maximo_deteccion (float): Tiempo máximo para considerar una detección a tiempo (en segundos).
     """
-    from src.servidor.api import mongo
     try:
         # Obtener la fecha y hora actual en la zona horaria deseada
         now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
@@ -84,8 +79,7 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio
         update_fields = {}
 
         # Si el estudiante ya tiene una detección (estado "confirmado" o "tarde")
-        if estudiante_encontrado["estado"] in ["confirmado", "tarde"]:
-            # Manejar el caso en que confianza sea None (por ejemplo, registro creado manualmente)
+        if estudiante_encontrado["estado"] in ["confirmado", "tarde"]:            
             confianza_existente = estudiante_encontrado["confianza"]
             if confianza_existente is None or confianza > confianza_existente:
                 update_fields["confianza"] = confianza
@@ -148,6 +142,7 @@ def registrar_asistencia_en_db(id_clase, id_estudiante, confianza, tiempo_inicio
         logger.error(f"Error al registrar asistencia para estudiante {id_estudiante} en clase {id_clase}: {e}")
     
 def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
+    """Crea un documento de asistencia si no existe para la clase y fecha indicadas."""
     existe = mongo.db.asistencias.find_one({"id_clase": id_clase, "fecha": fecha_str})
     if not existe:
         mongo.db.asistencias.insert_one({
@@ -161,9 +156,7 @@ def crear_asistencia_si_no_existe(id_clase, fecha_str, id_aula):
         print(f"[ASISTENCIA] Documento ya existe para {id_clase} en {fecha_str}")
 
 def obtener_aula_por_raspberry(id_raspberry_pi: str) -> str:
-    """
-    Obtiene el ID del aula asignada a una Raspberry Pi.
-    """
+    """Obtiene el ID del aula asignada a una Raspberry Pi."""
     raspberry = get_raspberry_by_id(id_raspberry_pi)
     if not raspberry:
         return None
@@ -180,50 +173,31 @@ def obtener_clase_activa_para_aula(id_aula: str, detener: bool = False) -> str:
     now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
     zona_horaria = pytz.timezone("Europe/Madrid")
     now = now_utc.astimezone(zona_horaria)  # Convertir a otra zona
-    dia_actual_ingles = now.strftime("%A").lower()  # Ej. "monday"
-    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles)  # Convertir a español, ej. "lunes"
+    dia_actual_ingles = now.strftime("%A").lower() 
+    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles)  
     hora_actual = now.time()
-    #logger.debug(f"Verificando clase activa para aula {id_aula}: Día actual: {dia_actual}, Hora actual: {hora_actual.strftime('%H:%M:%S')}")
 
-    # Buscar clases que tengan un horario en el aula usando $elemMatch
     query = {"horarios": {"$elemMatch": {"id_aula": id_aula}}}
-    #logger.debug(f"Ejecutando consulta en clases_collection: {query} (Timestamp: {now})")
     clases = list(clases_collection.find(query))
-    #logger.debug(f"Clases encontradas para aula {id_aula}: {len(clases)} clases")
     
-    # Log de todas las clases retornadas por la consulta
-    clases_ids = [clase['id_clase'] for clase in clases]
-    #logger.debug(f"IDs de clases encontradas: {clases_ids}")
-
+    # Buscar la clase activa
     for clase in clases:
-        #logger.debug(f"Clase {clase['id_clase']} encontrada para aula {id_aula}, Horarios: {clase['horarios']}")
-
-        for horario in clase["horarios"]:
-            #logger.debug(f"Verificando horario: Día={horario['dia']}, Hora inicio={horario['hora_inicio']}, Hora fin={horario['hora_fin']}, Aula={horario['id_aula']}")
-            if horario["id_aula"] != id_aula:
-                #logger.debug(f"Horario descartado: id_aula {horario['id_aula']} no coincide con {id_aula}")
+        for horario in clase["horarios"]:        
+            if horario["id_aula"] != id_aula:                
                 continue
-            if horario["dia"] != dia_actual:
-                #logger.debug(f"Horario descartado: Día {horario['dia']} no coincide con día actual {dia_actual}")
+            if horario["dia"] != dia_actual:                
                 continue
 
             # Convertir hora_inicio y hora_fin a objetos time
             hora_inicio = datetime.strptime(horario["hora_inicio"], "%H:%M").time()
-            hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()
-            #logger.debug(f"Horario válido para comparación: Día={horario['dia']}, Hora inicio={hora_inicio.strftime('%H:%M:%S')}, Hora fin={hora_fin.strftime('%H:%M:%S')}")
+            hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()           
 
             # Comparar si la hora actual está dentro del rango
-            if hora_inicio <= hora_actual <= hora_fin:
-                #logger.debug(f"Clase activa encontrada: {clase['id_clase']} (Horario: {horario['hora_inicio']}-{horario['hora_fin']})")
-                return clase["id_clase"]
-            # Si detener=True, verificar si la clase ya terminó
-            if detener and hora_actual > hora_fin:
-                #logger.debug(f"Clase {clase['id_clase']} descartada porque ya terminó (hora actual {hora_actual.strftime('%H:%M:%S')} > hora_fin {hora_fin.strftime('%H:%M:%S')})")
+            if hora_inicio <= hora_actual <= hora_fin:                
+                return clase["id_clase"]            
+            if detener and hora_actual > hora_fin:            
                 return None
-            #else:
-            #    logger.debug(f"Horario no coincide: hora actual {hora_actual.strftime('%H:%M:%S')} no está entre {hora_inicio.strftime('%H:%M:%S')} y {hora_fin.strftime('%H:%M:%S')}")
-
-    #logger.debug(f"No se encontró ninguna clase activa para aula {id_aula}")
+            
     return None
 
 def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> None:
@@ -258,15 +232,7 @@ def crear_asistencia_si_no_existe(id_clase: str, fecha: str, id_aula: str) -> No
     create_asistencia(id_clase, fecha, id_aula, registros)
 
 def obtener_clases_por_usuario(id_usuario):
-    """
-    Obtiene todas las clases asociadas a un usuario (profesor) por su id_usuario.
-    
-    Args:
-        id_usuario (str): ID del usuario (profesor).
-    
-    Returns:
-        list: Lista de documentos de clases asociadas al usuario.
-    """
+    """Obtiene todas las clases asociadas a un usuario (profesor) por su id_usuario."""
     try:
         clases = list(clases_collection.find({"id_usuario": id_usuario}))
         return clases
@@ -318,51 +284,41 @@ def obtener_aula_por_clase(id_clase: str) -> str:
     return None
 
 def verificar_clase_activa(id_aula: str, id_clase: str) -> bool:
-    """
-    Verifica si una clase específica sigue activa para un aula en el momento actual.
-    """
+    """Verifica si una clase específica sigue activa para un aula en el momento actual."""
     # Obtener la fecha y hora actual
     now_utc = datetime.utcnow().replace(tzinfo=pytz.UTC)
     zona_horaria = pytz.timezone("Europe/Madrid")
     now = now_utc.astimezone(zona_horaria)  # Convertir a otra zona
-    dia_actual_ingles = now.strftime("%A").lower()  # Ej. "monday"
-    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles)  # Convertir a español, ej. "lunes"
+    dia_actual_ingles = now.strftime("%A").lower()  
+    dia_actual = DIAS_EN_ESPANOL.get(dia_actual_ingles, dia_actual_ingles) 
     hora_actual = now.time()
-    #logger.debug(f"Verificando si clase {id_clase} sigue activa para aula {id_aula}: Día actual: {dia_actual}, Hora actual: {hora_actual.strftime('%H:%M:%S')}")
 
     # Buscar la clase específica
     query = {"id_clase": id_clase, "horarios": {"$elemMatch": {"id_aula": id_aula}}}
-    #logger.debug(f"Ejecutando consulta en clases_collection: {query} (Timestamp: {now})")
     clase = clases_collection.find_one(query)
     
     if not clase:
-        #logger.debug(f"Clase {id_clase} no encontrada para aula {id_aula}")
+        logger.debug(f"Clase {id_clase} no encontrada para aula {id_aula}")
         return False
 
-    #logger.debug(f"Clase {clase['id_clase']} encontrada para aula {id_aula}, Horarios: {clase['horarios']}")
-    
     # Verificar los horarios de la clase
-    for horario in clase["horarios"]:
-        #logger.debug(f"Verificando horario: Día={horario['dia']}, Hora inicio={horario['hora_inicio']}, Hora fin={horario['hora_fin']}, Aula={horario['id_aula']}")
+    for horario in clase["horarios"]:        
         if horario["id_aula"] != id_aula:
-            #logger.debug(f"Horario descartado: id_aula {horario['id_aula']} no coincide con {id_aula}")
             continue
-        if horario["dia"] != dia_actual:
-            #logger.debug(f"Horario descartado: Día {horario['dia']} no coincide con día actual {dia_actual}")
+        if horario["dia"] != dia_actual:            
             continue
 
         # Convertir hora_inicio y hora_fin a objetos time
         hora_inicio = datetime.strptime(horario["hora_inicio"], "%H:%M").time()
-        hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()
-        #logger.debug(f"Horario válido para comparación: Día={horario['dia']}, Hora inicio={hora_inicio.strftime('%H:%M:%S')}, Hora fin={hora_fin.strftime('%H:%M:%S')}")
+        hora_fin = datetime.strptime(horario["hora_fin"], "%H:%M").time()        
 
         # Comparar si la hora actual está dentro del rango
         if hora_inicio <= hora_actual <= hora_fin:
-            #logger.debug(f"Clase {clase['id_clase']} sigue activa (Horario: {horario['hora_inicio']}-{horario['hora_fin']})")
+            logger.debug(f"Clase {clase['id_clase']} sigue activa (Horario: {horario['hora_inicio']}-{horario['hora_fin']})")
             return True
         else:
-            #logger.debug(f"Horario no coincide: hora actual {hora_actual.strftime('%H:%M:%S')} no está entre {hora_inicio.strftime('%H:%M:%S')} y {hora_fin.strftime('%H:%M:%S')}")
+            logger.debug(f"Horario no coincide: hora actual {hora_actual.strftime('%H:%M:%S')} no está entre {hora_inicio.strftime('%H:%M:%S')} y {hora_fin.strftime('%H:%M:%S')}")
             return False
 
-    #logger.debug(f"No se encontró un horario activo para clase {id_clase} en aula {id_aula}")
+    logger.debug(f"No se encontró un horario activo para clase {id_clase} en aula {id_aula}")
     return False

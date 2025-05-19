@@ -18,14 +18,16 @@ class AsistenciaActualResource(Resource):
     })
     @ns.marshal_with(asistencia_model)
     def get(self):
-        """Obtiene la asistencia actual de una clase"""
+        """
+        Obtiene la asistencia actual de una clase para una fecha dada.
+        Requiere id_clase y fecha como parámetros.
+        """
         parser = reqparse.RequestParser()
         parser.add_argument("id_clase", type=str, required=True)
         parser.add_argument("fecha", type=str, required=True)
         args = parser.parse_args()
 
-        asistencia = get_asistencia(args["id_clase"], args["fecha"])
-        logger.info(f"/asistencias/actual: clase {args['id_clase']} en fecha {args['fecha']}")
+        asistencia = get_asistencia(args["id_clase"], args["fecha"])        
         return asistencia or {}, 200
 
 @ns.route("/asistencias/<string:id_estudiante>")
@@ -38,7 +40,10 @@ class ActualizarAsistenciaResource(Resource):
         "estado": fields.String(required=True, enum=["confirmado", "tarde", "ausente"])
     }))
     def put(self, id_estudiante):
-        """Actualiza el estado de asistencia de un estudiante"""
+        """
+        Actualiza el estado de asistencia de un estudiante para una clase y fecha.
+        Solo accesible para profesores autenticados.
+        """
         data = ns.payload
         profesor_id = get_jwt_identity()
 
@@ -71,12 +76,12 @@ class ListadoAsistenciasResource(Resource):
         """
         Devuelve un listado de documentos de asistencia para todas las clases del profesor,
         sin expandir la lista de estudiantes.
+        Permite filtrar por clase y rango de fechas.
         """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
         if not user or user["rol"] != "profesor":
-            logger.error(f"Usuario {identity} no tiene permisos de profesor")
             return {"error": "Acceso denegado"}, 403
 
         parser = reqparse.RequestParser()
@@ -96,7 +101,6 @@ class ListadoAsistenciasResource(Resource):
 
         clases = list(clases_collection.find(query_clases))
         if not clases:
-            logger.info(f"No se encontraron clases para el profesor {identity}")
             return [], 200
 
         # Obtener los IDs de las clases
@@ -143,8 +147,7 @@ class ListadoAsistenciasResource(Resource):
                 "nombre_aula": nombre_aula
             }
             resultado.append(item)
-
-        logger.info(f"Listado de asistencias para el profesor {identity}: {len(resultado)} registros")
+        
         return resultado, 200
 
 @ns.route("/asistencias/detalle")
@@ -158,6 +161,7 @@ class DetalleAsistenciaResource(Resource):
         """
         Devuelve el detalle de un documento de asistencia 
         (id_clase, fecha) con la lista de estudiantes expandida.
+        Incluye nombres de estudiantes y estados de asistencia.
         """
         parser = reqparse.RequestParser()
         parser.add_argument("id_clase", type=str, required=True)
@@ -218,7 +222,10 @@ class ExportarAsistenciasResource(Resource):
         "formato": "Formato de exportación (xlsx o csv, por defecto xlsx)"
     })
     def get(self):
-        """Exporta asistencias en formato Excel (.xlsx) o CSV con nombres completos"""
+        """
+        Exporta asistencias en formato Excel (.xlsx) o CSV con nombres completos.
+        Permite filtrar por clase y rango de fechas.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
@@ -245,7 +252,6 @@ class ExportarAsistenciasResource(Resource):
 
         clases = list(clases_collection.find(query_clases))
         if not clases:
-            logger.info(f"No se encontraron clases para el profesor {identity}")
             return {"mensaje": "No se encontraron clases para exportar"}, 404
 
         # Obtener los IDs de las clases
@@ -303,7 +309,6 @@ class ExportarAsistenciasResource(Resource):
                 })
 
         if not registros_exportar:
-            logger.info(f"No se encontraron registros para exportar para el profesor {identity}")
             return {"mensaje": "No se encontraron registros para exportar"}, 404
 
         df = pd.DataFrame(registros_exportar)
@@ -345,7 +350,10 @@ class RegistrarAsistenciaResource(Resource):
         })))
     }))
     def post(self):
-        """Registra asistencias detectadas automáticamente"""
+        """
+        Registra asistencias detectadas automáticamente para una clase y fecha.
+        Si ya existe el documento de asistencia, añade solo los nuevos registros.
+        """
         data = ns.payload
         id_clase = data["id_clase"]
         id_aula = data["id_aula"]
@@ -453,6 +461,5 @@ class AsistenciasEstudianteResource(Resource):
                 "ausentes": ausentes
             }
         }
-
-        #logger.info(f"Resultado para id_estudiante={args['id_estudiante']}: {resultado}")  # Depuración
+                
         return resultado, 200

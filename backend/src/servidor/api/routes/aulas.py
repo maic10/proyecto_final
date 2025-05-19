@@ -1,4 +1,3 @@
-# src/servidor/api/routes/aulas.py
 from flask_restx import Resource
 from src.servidor.api import ns
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -12,12 +11,14 @@ class AulasResource(Resource):
     @ns.doc(description="Obtener la lista de aulas (solo para administradores)")
     @ns.marshal_list_with(aula_model)
     def get(self):
-        """Obtener la lista de aulas"""
+        """
+        Devuelve la lista de aulas registradas en el sistema.
+        Solo accesible para administradores autenticados.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         aulas = list(aulas_collection.find())

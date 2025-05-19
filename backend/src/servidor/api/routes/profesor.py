@@ -1,4 +1,3 @@
-# src/servidor/api/routes/profesor.py
 from flask_restx import Resource
 from src.servidor.api import ns
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -17,7 +16,6 @@ class ProfesoresResource(Resource):
         user = get_user_by_id(identity)
 
         if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
             return {"error": "Acceso denegado"}, 403
 
         profesores = usuarios_collection.find({"rol": "profesor"})
@@ -27,7 +25,6 @@ class ProfesoresResource(Resource):
                 "nombre": prof["nombre"],
                 "correo": prof["correo"],
                 "rol": prof["rol"]
-                # Excluimos el campo "contrasena"
             }
             for prof in profesores
         ]

@@ -1,4 +1,3 @@
-# src/servidor/api/routes/estudiantes.py
 from flask import request, jsonify
 from flask_restx import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -22,14 +21,15 @@ class EstudiantesResource(Resource):
         "incluir_foto": "Incluir las fotos de los estudiantes (true/false, por defecto false)"
     })
     def get(self):
-        """Lista los estudiantes de una clase específica o de todas las clases del usuario autenticado"""
+        """
+        Lista los estudiantes de una clase específica o de todas las clases del usuario autenticado.
+        Permite incluir las fotos de los estudiantes si se solicita.
+        Solo accesible para profesores y administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        logger.info(f"Usuario autenticado: {identity}, rol: {user.get('rol') if user else 'None'}")
-
         if not user or user["rol"] not in ["profesor", "admin"]:
-            logger.error("Acceso denegado: usuario no es profesor ni administrador")
             return {"mensaje": "Acceso denegado"}, 403
 
         parser = reqparse.RequestParser()
@@ -44,23 +44,18 @@ class EstudiantesResource(Resource):
             estudiantes_unicos = list({est["id_estudiante"]: est for est in estudiantes}.values())
         else:
             clases = list(obtener_clases_por_usuario(identity))
-            if not clases:
-                logger.info("El profesor no tiene clases asignadas")
+            if not clases:                
                 return [], 200
 
             if class_id:
-                if not any(clase["id_clase"] == class_id for clase in clases):
-                    logger.error(f"Clase {class_id} no encontrada o no autorizada para el usuario {identity}")
+                if not any(clase["id_clase"] == class_id for clase in clases):                    
                     return {"mensaje": "Clase no encontrada o no autorizada"}, 403
                 clases_ids = [class_id]
             else:
                 clases_ids = [clase["id_clase"] for clase in clases]
-
-            logger.info(f"Clases seleccionadas: {clases_ids}")
+        
             estudiantes = estudiantes_collection.find({"ids_clases": {"$in": clases_ids}})
-            estudiantes_unicos = list({est["id_estudiante"]: est for est in estudiantes}.values())
-
-        logger.info(f"Estudiantes encontrados: {len(estudiantes_unicos)}")
+            estudiantes_unicos = list({est["id_estudiante"]: est for est in estudiantes}.values())        
 
         estudiantes_response = []
         for estudiante in estudiantes_unicos:
@@ -71,9 +66,7 @@ class EstudiantesResource(Resource):
 
             if include_photos:
                 imagenes_ids = estudiante_dict.get("imagenes_ids", [])
-                imagenes_base64 = []
-
-                logger.info(f"Estudiante {estudiante['id_estudiante']}")
+                imagenes_base64 = []            
 
                 for file_id in imagenes_ids:
                     try:
@@ -102,8 +95,7 @@ class EstudiantesResource(Resource):
 
             estudiante_dict["_id"] = str(estudiante_dict["_id"])
             estudiantes_response.append(estudiante_dict)
-
-        logger.info(f"Respuesta enviada con {len(estudiantes_response)} estudiantes")
+        
         return estudiantes_response, 200
 
 @ns.route("/estudiantes/nuevo")
@@ -111,12 +103,14 @@ class EstudianteNuevoResource(Resource):
     @jwt_required()
     @ns.doc(description="Crear un nuevo estudiante (solo para administradores)")
     def post(self):
-        """Crear un nuevo estudiante"""
+        """
+        Crear un nuevo estudiante.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":        
             return {"error": "Acceso denegado"}, 403
 
         data = request.get_json()
@@ -124,17 +118,14 @@ class EstudianteNuevoResource(Resource):
         apellido = data.get("apellido")
         ids_clases = data.get("ids_clases", [])
 
-        if not nombre or not apellido:
-            logger.error("Faltan datos requeridos para crear el estudiante")
+        if not nombre or not apellido:            
             return {"error": "Faltan datos requeridos (nombre, apellido)"}, 400
 
-        if not isinstance(ids_clases, list):
-            logger.error("ids_clases debe ser una lista")
+        if not isinstance(ids_clases, list):            
             return {"error": "ids_clases debe ser una lista"}, 400
 
         for id_clase in ids_clases:
-            if not isinstance(id_clase, str):
-                logger.error(f"ID de clase inválido: {id_clase}")
+            if not isinstance(id_clase, str):                
                 return {"error": "Todos los IDs de clases deben ser cadenas"}, 400
 
         contador = 1
@@ -153,10 +144,8 @@ class EstudianteNuevoResource(Resource):
         }
 
         try:
-            estudiantes_collection.insert_one(nuevo_estudiante)
-            logger.info(f"Estudiante creado: {nuevo_id}, nombre: {nombre} {apellido}")
-        except Exception as e:
-            logger.error(f"Error al insertar el estudiante: {e}")
+            estudiantes_collection.insert_one(nuevo_estudiante)            
+        except Exception as e:            
             return {"error": "Error al crear el estudiante en la base de datos"}, 500
 
         nuevo_estudiante["_id"] = str(nuevo_estudiante["_id"])
@@ -167,17 +156,19 @@ class EstudianteResource(Resource):
     @jwt_required()
     @ns.doc(description="Obtener un estudiante específico (solo para administradores)")
     def get(self, id_estudiante):
-        """Obtener un estudiante específico"""
+        """
+        Obtener un estudiante específico.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
         if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+
             return {"error": "Acceso denegado"}, 403
 
         estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
         if not estudiante:
-            logger.error(f"Estudiante {id_estudiante} no encontrado")
             return {"error": "Estudiante no encontrado"}, 404
 
         estudiante_dict = dict(estudiante)
@@ -202,8 +193,7 @@ class EstudianteResource(Resource):
                     "data": imagen_base64,
                     "mimetype": mimetype
                 })
-            except Exception as e:
-                logger.error(f"Error al cargar la imagen {file_id} para el estudiante {id_estudiante}: {e}")
+            except Exception as e:                
                 continue
 
         estudiante_dict["imagenes"] = imagenes_base64
@@ -217,17 +207,18 @@ class EstudianteResource(Resource):
     @jwt_required()
     @ns.doc(description="Actualizar un estudiante existente (solo para administradores)")
     def put(self, id_estudiante):
-        """Actualizar un estudiante existente"""
+        """
+        Actualizar un estudiante existente.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
-        if not estudiante:
-            logger.error(f"Estudiante {id_estudiante} no encontrado")
+        if not estudiante:            
             return {"error": "Estudiante no encontrado"}, 404
 
         data = request.get_json()
@@ -235,8 +226,7 @@ class EstudianteResource(Resource):
         apellido = data.get("apellido")
         ids_clases = data.get("ids_clases")
 
-        if not nombre or not apellido:
-            logger.error("Faltan datos requeridos para actualizar el estudiante")
+        if not nombre or not apellido:            
             return {"error": "Faltan datos requeridos (nombre, apellido)"}, 400
 
         update_data = {
@@ -246,8 +236,7 @@ class EstudianteResource(Resource):
         if ids_clases is not None:
             update_data["ids_clases"] = ids_clases
 
-        estudiantes_collection.update_one({"id_estudiante": id_estudiante}, {"$set": update_data})
-        logger.info(f"Estudiante actualizado: {id_estudiante}, nombre: {nombre} {apellido}")
+        estudiantes_collection.update_one({"id_estudiante": id_estudiante}, {"$set": update_data})        
 
         updated_estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
         updated_estudiante["_id"] = str(updated_estudiante["_id"])
@@ -256,59 +245,57 @@ class EstudianteResource(Resource):
     @jwt_required()
     @ns.doc(description="Eliminar un estudiante (solo para administradores)")
     def delete(self, id_estudiante):
-        """Eliminar un estudiante existente"""
+        """
+        Eliminar un estudiante existente.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
-        if not estudiante:
-            logger.error(f"Estudiante {id_estudiante} no encontrado")
+        if not estudiante:            
             return {"error": "Estudiante no encontrado"}, 404
 
         imagenes_ids = estudiante.get("imagenes_ids", [])
         for file_id in imagenes_ids:
             try:
-                fs.delete(ObjectId(file_id))
-                logger.info(f"Imagen {file_id} eliminada para el estudiante {id_estudiante}")
+                fs.delete(ObjectId(file_id))                
             except Exception as e:
                 logger.error(f"Error al eliminar la imagen {file_id}: {e}")
 
         estudiantes_collection.delete_one({"id_estudiante": id_estudiante})
-        logger.info(f"Estudiante eliminado: {id_estudiante}")
+
         return {"mensaje": "Estudiante eliminado correctamente"}, 200
 
 @ns.route("/estudiantes/<string:id_estudiante>/subir-imagen")
 class SubirImagenEstudiante(Resource):
     @jwt_required()
     def post(self, id_estudiante):
-        """Subir una imagen para un estudiante y guardarla en GridFS"""
+        """
+        Subir una imagen para un estudiante y guardarla en GridFS.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
-        if not estudiante:
-            logger.error(f"Estudiante {id_estudiante} no encontrado")
+        if not estudiante:            
             return {"error": "Estudiante no encontrado"}, 404
 
-        if 'imagen' not in request.files:
-            logger.error("No se envió ninguna imagen")
+        if 'imagen' not in request.files:            
             return {"error": "No se envió ninguna imagen"}, 400
 
         imagen = request.files['imagen']
-        if imagen.filename == '':
-            logger.error("Nombre de archivo vacío")
+        if imagen.filename == '':            
             return {"error": "Nombre de archivo vacío"}, 400
 
         imagen_data = imagen.read()
-        if not imagen_data:
-            logger.error("Archivo de imagen vacío")
+        if not imagen_data:            
             return {"error": "Archivo de imagen vacío"}, 400
 
         try:
@@ -316,8 +303,7 @@ class SubirImagenEstudiante(Resource):
                 imagen_data,
                 filename=imagen.filename,
                 metadata={"id_estudiante": id_estudiante}
-            )
-            logger.info(f"Imagen guardada en GridFS con ID {file_id}")
+            )            
 
             # Generar embedding para la imagen recién subida
             embedding_generator = GridFSEmbeddingsGenerator()
@@ -329,20 +315,17 @@ class SubirImagenEstudiante(Resource):
 
             imagenes_ids.append(str(file_id))
             if embedding:
-                embeddings.append(embedding)
-                logger.info(f"Embedding generado para la imagen {file_id} del estudiante {id_estudiante}")
+                embeddings.append(embedding)                
             else:
                 logger.warning(f"No se pudo generar embedding para la imagen {file_id} del estudiante {id_estudiante}")
 
             estudiantes_collection.update_one(
                 {"id_estudiante": id_estudiante},
                 {"$set": {"imagenes_ids": imagenes_ids, "embeddings": embeddings}}
-            )
-            logger.info(f"ID de imagen {file_id} y embedding añadido al estudiante {id_estudiante}")
+            )            
 
             return {"mensaje": "Imagen subida correctamente", "file_id": str(file_id)}, 200
-        except Exception as e:
-            logger.error(f"Error al guardar la imagen o generar el embedding: {e}")
+        except Exception as e:            
             return {"error": "Error al guardar la imagen o generar el embedding"}, 500
 
 @ns.route("/estudiantes/<string:id_estudiante>/imagenes/<string:file_id>")
@@ -350,21 +333,21 @@ class EliminarImagenEstudiante(Resource):
     @jwt_required()
     @ns.doc(description="Eliminar una imagen de un estudiante (solo para administradores)")
     def delete(self, id_estudiante, file_id):
-        """Eliminar una imagen específica de un estudiante"""
+        """
+        Eliminar una imagen específica de un estudiante y su embedding asociado.
+        Solo accesible para administradores.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":        
             return {"error": "Acceso denegado"}, 403
 
         estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
-        if not estudiante:
-            logger.error(f"Estudiante {id_estudiante} no encontrado")
+        if not estudiante:            
             return {"error": "Estudiante no encontrado"}, 404
 
         imagenes_ids = estudiante.get("imagenes_ids", [])
-        if file_id not in imagenes_ids:
-            logger.error(f"Imagen {file_id} no encontrada para el estudiante {id_estudiante}")
+        if file_id not in imagenes_ids:            
             return {"error": "Imagen no encontrada"}, 404
 
         try:
@@ -382,7 +365,6 @@ class EliminarImagenEstudiante(Resource):
             embeddings = estudiante.get("embeddings", [])
             if embeddings and index < len(embeddings):
                 embeddings.pop(index)
-                logger.info(f"Embedding en la posición {index} eliminado para el estudiante {id_estudiante}")
             else:
                 logger.info(f"No se encontró un embedding en la posición {index} para eliminar")
 
@@ -390,8 +372,7 @@ class EliminarImagenEstudiante(Resource):
             estudiantes_collection.update_one(
                 {"id_estudiante": id_estudiante},
                 {"$set": {"imagenes_ids": imagenes_ids, "embeddings": embeddings}}
-            )
-            logger.info(f"ID de imagen {file_id} y embedding eliminado del estudiante {id_estudiante}")
+            )            
 
             return {"mensaje": "Imagen y embedding eliminados correctamente"}, 200
         except Exception as e:
@@ -402,11 +383,14 @@ class EliminarImagenEstudiante(Resource):
 class ServirImagen(Resource):
     @jwt_required()
     def get(self, file_id):
-        """Servir una imagen desde GridFS"""
+        """
+        Servir una imagen desde GridFS.
+        Solo accesible para profesores y administradores.
+        Los profesores solo pueden acceder a imágenes de sus propios estudiantes.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
-        if not user or user["rol"] not in ["profesor", "admin"]:
-            logger.error(f"Usuario {identity} no tiene permisos para acceder a la imagen {file_id}")
+        if not user or user["rol"] not in ["profesor", "admin"]:            
             return {"error": "Acceso denegado"}, 403
 
         try:
@@ -416,14 +400,12 @@ class ServirImagen(Resource):
             if user["rol"] == "profesor":
                 id_estudiante = grid_out.metadata.get("id_estudiante")
                 estudiante = estudiantes_collection.find_one({"id_estudiante": id_estudiante})
-                if not estudiante:
-                    logger.error(f"Estudiante {id_estudiante} no encontrado para la imagen {file_id}")
+                if not estudiante:                    
                     return {"error": "Estudiante no encontrado"}, 404
 
                 clases = obtener_clases_por_usuario(identity)
                 clases_ids = [clase["id_clase"] for clase in clases]
-                if not any(clase_id in clases_ids for clase_id in estudiante["ids_clases"]):
-                    logger.error(f"Usuario {identity} no tiene acceso a la imagen {file_id}")
+                if not any(clase_id in clases_ids for clase_id in estudiante["ids_clases"]):                    
                     return {"error": "Acceso denegado"}, 403
 
             return send_file(
@@ -447,12 +429,15 @@ class EstudiantesFiltrarResource(Resource):
     })
     @ns.marshal_list_with(estudiante_model)
     def get(self):
-        """Filtrar estudiantes por profesor y/o asignatura"""
+        """
+        Filtrar estudiantes por profesor y/o asignatura.
+        Solo accesible para administradores.
+        Permite incluir fotos de los estudiantes si se solicita.
+        """
         identity = get_jwt_identity()
         user = get_user_by_id(identity)
 
-        if not user or user["rol"] != "admin":
-            logger.error(f"Usuario {identity} no tiene permisos de administrador")
+        if not user or user["rol"] != "admin":            
             return {"error": "Acceso denegado"}, 403
 
         parser = reqparse.RequestParser()
@@ -474,8 +459,7 @@ class EstudiantesFiltrarResource(Resource):
 
         # Obtener las clases que cumplen con los criterios
         clases_filtradas = list(clases_collection.find(query_clases))
-        if not clases_filtradas:
-            logger.info("No se encontraron clases para los criterios de filtrado")
+        if not clases_filtradas:            
             return [], 200
 
         # Obtener los IDs de las clases filtradas
@@ -494,6 +478,5 @@ class EstudiantesFiltrarResource(Resource):
             estudiante["ids_clases"] = estudiante.get("ids_clases", [])
             if not incluir_foto:
                 estudiante.pop("imagenes", None)
-
-        logger.info(f"Estudiantes encontrados: {len(estudiantes)}")
+        
         return estudiantes, 200

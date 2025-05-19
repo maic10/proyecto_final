@@ -1,4 +1,3 @@
-# src/logica/logger.py
 import logging
 import os
 

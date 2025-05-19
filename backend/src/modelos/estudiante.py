@@ -6,5 +6,5 @@ estudiante_model = ns.model("Estudiante", {
     "nombre": fields.String(required=True),
     "apellido": fields.String(required=True),
     "urls_fotos": fields.List(fields.String),
-    "embeddings": fields.List(fields.Raw)  # Opcional, para los embeddings
+    "embeddings": fields.List(fields.Raw)  
 })

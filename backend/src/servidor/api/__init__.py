@@ -1,4 +1,3 @@
-# src/servidor/api/__init__.py
 from flask import Flask
 from flask_restx import Api
 from flask_pymongo import PyMongo
@@ -6,13 +5,13 @@ from flask_jwt_extended import JWTManager
 from src.config.settings import MONGO_URI, JWT_SECRET_KEY
 from flask_cors import CORS
 from src.logica.logger import logger
-from datetime import timedelta  # Importar timedelta para definir el tiempo de vida
+from datetime import timedelta 
 
 app = Flask(__name__)
 CORS(app)
 app.config["MONGO_URI"] = MONGO_URI
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=450)  #timedelta(hours=1)  # Establecer 1 hora de vida para el token
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=60)  
 
 mongo = PyMongo(app)
 jwt = JWTManager(app)
@@ -35,11 +34,9 @@ api = Api(
 ns = api.namespace("api", description="Operaciones principales")
 
 from src.servidor.api.auth import *
-from src.servidor.api.importar import *
 from src.servidor.api.auth_raspberry import *
 from src.servidor.api.routes.clases import *
 from src.servidor.api.routes.asistencias import *
-from src.servidor.api.routes.raspberry import *
 from src.servidor.api.routes.estudiantes import *
 from src.servidor.api.routes.transmision import *
 from src.servidor.api.routes.asignaturas import *

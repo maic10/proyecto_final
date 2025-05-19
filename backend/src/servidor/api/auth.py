@@ -1,4 +1,3 @@
-# src/servidor/api/auth.py
 from flask_restx import Resource, fields
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from src.servidor.api import ns
@@ -34,13 +33,17 @@ cambiar_contrasena_model = ns.model("CambiarContrasena", {
     "nuevaContrasena": fields.String(required=True, description="Nueva contraseña del usuario")
 })
 
-# Registrar la ruta para la solicitud de inicio de sesión
+
 @ns.route("/autenticacion/iniciar_sesion")
 class IniciarSesionResource(Resource):
     @ns.doc(body=login_request_model)
     @ns.response(200, "Inicio de sesión exitoso", login_response_model)
     @ns.response(401, "Credenciales inválidas")
     def post(self):
+        """
+        Inicia sesión de usuario.
+        Recibe correo y contraseña, valida las credenciales y devuelve un token JWT si son correctas.
+        """
         data = ns.payload
         usuario = usuarios_collection.find_one({"correo": data["correo"]})
         if usuario:
@@ -64,7 +67,7 @@ class IniciarSesionResource(Resource):
                 }, 200
         return {"mensaje": "Credenciales inválidas"}, 401
 
-# Registrar la ruta para obtener el perfil del usuario autenticado
+
 @ns.route("/autenticacion/perfil")
 class PerfilResource(Resource):
     @jwt_required()
@@ -73,6 +76,10 @@ class PerfilResource(Resource):
     @ns.response(200, "Datos del usuario")
     @ns.response(404, "Usuario no encontrado")
     def get(self):
+        """
+        Devuelve el perfil del usuario autenticado.
+        Requiere un token JWT válido.
+        """        
         id_usuario = get_jwt_identity()
         usuario = usuarios_collection.find_one({"id_usuario": id_usuario})
         if not usuario:
@@ -93,7 +100,10 @@ class CambiarContrasena(Resource):
     @ns.response(404, "Usuario no encontrado")
     @ns.response(422, "La contraseña actual es incorrecta")
     def post(self):
-        """Cambia la contraseña del usuario autenticado."""
+        """
+        Cambia la contraseña del usuario autenticado.
+        Requiere la contraseña actual y la nueva contraseña en el cuerpo de la petición.
+        """
         # Usar ns.payload para obtener los datos del cuerpo
         data = ns.payload
         logger.debug(f"Recibida solicitud para cambiar contraseña: {data}")
