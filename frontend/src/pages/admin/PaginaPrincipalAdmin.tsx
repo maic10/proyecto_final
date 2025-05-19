@@ -13,7 +13,7 @@ function PaginaPrincipalAdmin() {
     <div className="container py-5">
       <div className="row mb-4 align-items-center">
         <div className="col-12 text-center">
-          <h1 className="display-4 fw-bold text-primary mb-2">
+          <h1 className="display-6 fw-bold text-primary mb-2">
             ¡Hola, Administrador!
           </h1>
           <p className="lead text-muted">

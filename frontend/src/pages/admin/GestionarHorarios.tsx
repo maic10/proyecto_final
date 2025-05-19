@@ -11,7 +11,7 @@ const GestionarHorarios: React.FC = () => {
   const [clases, setClases] = useState<Clase[]>([]);
   const [filtroProfesor, setFiltroProfesor] = useState<string>('');
   const [filtroAsignatura, setFiltroAsignatura] = useState<string>('');
-  const [filtroDebounced, setFiltroDebounced] = useState<string>(''); // Para debounce
+  const [filtroDebounced, setFiltroDebounced] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -34,7 +34,6 @@ const GestionarHorarios: React.FC = () => {
     cargarDatosIniciales();
   }, []);
 
-  // Debounce para los filtros
   useEffect(() => {
     const handler = setTimeout(() => {
       setFiltroDebounced(filtroProfesor || filtroAsignatura);
@@ -72,7 +71,8 @@ const GestionarHorarios: React.FC = () => {
   }, [filtroDebounced]);
 
   const handleSelectClase = (clase: Clase) => {
-    navigate(`/admin/horarios/editar/${clase.id_clase}`); // Redirigir a la página de edición
+    // Pasar el id_clase a través del estado en lugar de la URL
+    navigate('/admin/horarios/editar', { state: { idClase: clase.id_clase } });
   };
 
   // Mapear IDs a nombres para mostrar en la lista
@@ -88,7 +88,7 @@ const GestionarHorarios: React.FC = () => {
 
   return (
     <div className="container py-5">
-      <h2 className="mb-4">Gestión de Horarios</h2>
+      <h1 className="display-6 fw-bold text-primary mb-2">Gestión de Horarios</h1>
 
       {error && (
         <div className="alert alert-danger" role="alert" aria-live="assertive">
@@ -108,7 +108,7 @@ const GestionarHorarios: React.FC = () => {
               value={filtroProfesor}
               onChange={(e) => {
                 setFiltroProfesor(e.target.value);
-                setFiltroAsignatura(''); // Resetear el otro filtro
+                setFiltroAsignatura('');
               }}
               aria-label="Seleccionar profesor"
             >
@@ -128,7 +128,7 @@ const GestionarHorarios: React.FC = () => {
               value={filtroAsignatura}
               onChange={(e) => {
                 setFiltroAsignatura(e.target.value);
-                setFiltroProfesor(''); // Resetear el otro filtro
+                setFiltroProfesor('');
               }}
               aria-label="Seleccionar asignatura"
             >
@@ -170,7 +170,7 @@ const GestionarHorarios: React.FC = () => {
                   tabIndex={0}
                   style={{ cursor: 'pointer' }}
                 >
-                  Clase: {getNombreAsignatura(clase.id_asignatura)} - Profesor: {getNombreProfesor(clase.id_usuario)}
+                  Asignatura: {getNombreAsignatura(clase.id_asignatura)} - Profesor: {getNombreProfesor(clase.id_usuario)}
                 </li>
               ))}
             </ul>

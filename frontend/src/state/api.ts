@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { obtenerToken, obtenerUsuario, cerrarSesion } from './auth';
 import { API_BASE } from '../utils/constants';
-import { Horario, Clase, Profesor, Asignatura,Aula } from '../types/horarios';
+import { Horario, Clase, Profesor, Aula } from '../types/horarios';
 import { Estudiante } from '../types/estudiantes';
 
 // Crear una instancia de axios
@@ -30,7 +30,6 @@ axiosInstance.interceptors.response.use(
       // Cerrar sesión y redirigir al login
       cerrarSesion();
       window.location.href = '/'; 
-      // Evitar que el error cause un bucle infinito
       return new Promise(() => {});
     }
     return Promise.reject(error);
@@ -128,14 +127,27 @@ export async function obtenerAsistenciasActual(idClase: string, fecha: string) {
   return res;
 }
 
-export async function actualizarEstadoAsistencia(idEstudiante: string, idClase: string, fecha: string, estado: string) {
-  const res = await axiosInstance.put(`/asistencias/${idEstudiante}`, { id_clase: idClase, fecha, estado });
-  return res;
-}
+export const actualizarEstadoAsistencia = async (
+  idEstudiante: string,
+  idClase: string,
+  fecha: string,
+  nuevoEstado: string
+): Promise<void> => {
+  const usuario = obtenerUsuario();
+  const fechaModificacion = new Date().toISOString();
+
+  await axiosInstance.put(`/asistencias/${idEstudiante}`, {
+    id_clase: idClase,
+    fecha,
+    estado: nuevoEstado,
+    modificado_por_usuario: usuario?.id_usuario || 'desconocido',
+    modificado_fecha: fechaModificacion,
+  });
+};
 
 export async function verificarEstadoTransmision(idClase: string) {
   const params = { id_clase: idClase };
-  const res = await axiosInstance.get('/estado_web', { params });
+  const res = await axiosInstance.get('/transmision/estado_web', { params });
   return res;
 }
 
@@ -282,3 +294,24 @@ export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clas
 export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
   return await obtenerClasesAdmin(asignaturaId, undefined, undefined);
 };
+
+export const ajustarTiempoMaximo = async (idClase: string, tiempoMaximo: number) => {
+  const response = await axiosInstance.post(`/transmision/tiempo_maximo/${idClase}`, {
+    tiempo_maximo: tiempoMaximo,
+  });
+  return response.data;
+};
+
+export async function cambiarContrasena(contrasenaActual: string, nuevaContrasena: string) {
+  const res = await axiosInstance.post('/autenticacion/cambiar_contrasena', {
+    contrasenaActual,
+    nuevaContrasena
+  });
+  return res;
+}
+//export async function obtenerStreamVideo(idClase: string) {
+//  const res = await axiosInstance.get(`/transmision/video/${idClase}`, {
+//    responseType: 'blob', // Obtener la respuesta como un blob para el stream
+//  });
+//  return res; // Devuelve el blob directamente
+//}

@@ -91,7 +91,7 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
                   apellido={est.apellido}
                   fotoBase64={est.imagenes?.[0]?.data}
                   fotoMimetype={est.imagenes?.[0]?.mimetype}
-                  idEstudiante={est.id_estudiante}
+                  //idEstudiante={est.id_estudiante}
                   onClick={(buttonRef) => onEstudianteClick(est, buttonRef)}
                 />
               </div>

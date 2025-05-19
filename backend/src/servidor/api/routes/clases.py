@@ -4,7 +4,6 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.servidor.api import ns
 from src.modelos.clase import clase_model,clase_model_clases
 from src.logica.database import get_user_by_id, get_asignatura_by_id, aulas_collection, clases_collection
-from src.logica.utils import get_clases_by_usuario
 from src.logica.logger import logger
 
 @ns.route("/clases")

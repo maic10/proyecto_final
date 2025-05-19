@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 app.config["MONGO_URI"] = MONGO_URI
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=30)  #timedelta(hours=1)  # Establecer 1 hora de vida para el token
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=450)  #timedelta(hours=1)  # Establecer 1 hora de vida para el token
 
 mongo = PyMongo(app)
 jwt = JWTManager(app)
@@ -41,7 +41,6 @@ from src.servidor.api.routes.clases import *
 from src.servidor.api.routes.asistencias import *
 from src.servidor.api.routes.raspberry import *
 from src.servidor.api.routes.estudiantes import *
-from src.servidor.api.routes.video import *
 from src.servidor.api.routes.transmision import *
 from src.servidor.api.routes.asignaturas import *
 from src.servidor.api.routes.horarios import *

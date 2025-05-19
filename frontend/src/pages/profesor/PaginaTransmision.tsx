@@ -2,17 +2,23 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
-import { obtenerClases, obtenerAsistenciasActual, actualizarEstadoAsistencia, verificarEstadoTransmision, obtenerEstudiantes } from '../../state/api';
+import {
+  obtenerClases,
+  obtenerAsistenciasActual,
+  actualizarEstadoAsistencia,
+  verificarEstadoTransmision,
+  obtenerEstudiantes
+} from '../../state/api';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Clase, Horario } from '../../types/clases';
 import { Estudiante } from '../../types/estudiantes';
 import { RegistroAsistencia } from '../../types/asistencias';
 import { API_BASE } from '../../utils/constants';
 
-
 const PaginaTransmision: React.FC = () => {
   const [idClase, setIdClase] = useState<string | null>(null);
   const [nombreClase, setNombreClase] = useState<string>('');
+  const [nombreAula, setNombreAula] = useState<string>(''); // <-- nuevo estado para el aula
   const [clases, setClases] = useState<Clase[]>([]);
   const fechaActual = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
   const navigate = useNavigate();
@@ -23,10 +29,12 @@ const PaginaTransmision: React.FC = () => {
   const [mostrarVideo, setMostrarVideo] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [showInfo, setShowInfo] = useState<boolean>(false); // Estado para mostrar/ocultar explicación
 
   // Cargar clases y determinar la clase activa o más próxima
   useEffect(() => {
     const cargarDatosIniciales = async () => {
+      console.log('[Transmision] Iniciando carga de datos iniciales');
       const usuario = obtenerUsuario();
       if (!usuario) {
         navigate('/');
@@ -35,6 +43,7 @@ const PaginaTransmision: React.FC = () => {
 
       try {
         const clasesData = await obtenerClases(usuario.id_usuario);
+        console.log('[Transmision] Clases obtenidas:', clasesData);
         if (clasesData.length === 0) {
           setError('No tienes clases asignadas.');
           setCargando(false);
@@ -44,88 +53,80 @@ const PaginaTransmision: React.FC = () => {
         setClases(clasesData);
 
         const ahora = new Date();
-        const diaActual = ahora.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
-        const diasSemana = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds(); // Hora actual en segundos
+        const diaActual = ahora.getDay();
+        const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+        const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
 
         let claseActiva: Clase | null = null;
         let claseMasProxima: Clase | null = null;
         let fechaInicioMasProxima: Date | null = null;
+        let aulaSeleccionada = ''; // <-- variable temporal para el aula
 
-        // 1. Buscar una clase activa en el momento actual
+        // Buscar clase activa hoy
         for (const clase of clasesData) {
+          console.log(`[Transmision] Revisando horarios de ${clase.nombre_asignatura}`, clase.horarios);
           for (const horario of clase.horarios) {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
             if (diaHorario !== diaActual) continue;
 
-            const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
-            const [horaFin, minutosFin] = horario.hora_fin.split(':').map(Number);
-            const inicioSegundos = horaInicio * 3600 + minutosInicio * 60;
-            let finSegundos = horaFin * 3600 + minutosFin * 60;
+            const [horaI, minI] = horario.hora_inicio.split(':').map(Number);
+            const [horaF, minF] = horario.hora_fin.split(':').map(Number);
+            const inicioSeg = horaI * 3600 + minI * 60;
+            let finSeg = horaF * 3600 + minF * 60;
+            const cruzaMedianoche = finSeg < inicioSeg;
+            const dentro = cruzaMedianoche
+              ? (horaActual >= inicioSeg || horaActual <= finSeg)
+              : (inicioSeg <= horaActual && horaActual <= finSeg);
+            if (!dentro) continue;
+            
+            console.log(`[Transmision] Está dentro del horario ${horario.dia} ${horario.hora_inicio}-${horario.hora_fin}`);
 
-            // Manejar horarios que cruzan la medianoche
-            const cruzaMedianoche = finSegundos < inicioSegundos;
-            if (cruzaMedianoche) {
-              // Si cruza la medianoche, el horario termina el día siguiente
-              if (horaActual >= inicioSegundos || horaActual <= finSegundos) {
-                // Verificar si hay transmisión activa para esta clase
-                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
-                if (estadoTransmision.transmitir) {
-                  claseActiva = clase;
-                  break;
-                }
-              }
-            } else {
-              // Caso normal: horario dentro del mismo día
-              if (inicioSegundos <= horaActual && horaActual <= finSegundos) {
-                // Verificar si hay transmisión activa para esta clase
-                const estadoTransmision = await verificarEstadoTransmision(clase.id_clase);
-                if (estadoTransmision.transmitir) {
-                  claseActiva = clase;
-                  break;
-                }
-              }
+            const estado = await verificarEstadoTransmision(clase.id_clase);
+            console.log(`[Transmision] Estado transmisión para ${clase.id_clase}:`, estado);
+            if (estado.transmitir) {
+              console.log('[Transmision] Clase activa encontrada:', clase.nombre_asignatura);
+              claseActiva = clase;
+              aulaSeleccionada = horario.nombre_aula; // guardamos aula de este horario
+              break;
             }
           }
           if (claseActiva) break;
         }
 
-        // 2. Si no hay clase activa, buscar la clase más próxima a empezar
+        // Si no hay transmisión activa, buscar próxima clase
         if (!claseActiva) {
+          console.log('[Transmision] No hay transmisión activa, buscando próxima clase');
           for (const clase of clasesData) {
             for (const horario of clase.horarios) {
               const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
-              const [hora, minutos] = horario.hora_inicio.split(':').map(Number);
-              const fechaInicio = new Date(ahora);
-              fechaInicio.setHours(hora, minutos, 0, 0);
+              const [h, m] = horario.hora_inicio.split(':').map(Number);
+              const inicioFecha = new Date(ahora);
+              inicioFecha.setHours(h, m, 0, 0);
 
-              // Ajustar el día al próximo día de la semana correspondiente
-              const diasDiferencia = (diaHorario - diaActual + 7) % 7;
-              if (diasDiferencia === 0 && fechaInicio < ahora) {
-                // Si es hoy pero ya pasó, añadir una semana
-                fechaInicio.setDate(fechaInicio.getDate() + 7);
-              } else {
-                fechaInicio.setDate(fechaInicio.getDate() + diasDiferencia);
-              }
+              let diffDias = (diaHorario - diaActual + 7) % 7;
+              if (diffDias === 0 && inicioFecha < ahora) diffDias = 7;
+              inicioFecha.setDate(inicioFecha.getDate() + diffDias);
 
-              // Comparar para encontrar la fecha más próxima
-              if (!fechaInicioMasProxima || fechaInicio < fechaInicioMasProxima) {
-                fechaInicioMasProxima = fechaInicio;
+              if (!fechaInicioMasProxima || inicioFecha < fechaInicioMasProxima) {
+                fechaInicioMasProxima = inicioFecha;
                 claseMasProxima = clase;
+                aulaSeleccionada = horario.nombre_aula; // guardamos aula para próxima clase
               }
             }
           }
+          console.log('[Transmision] Próxima clase:', claseMasProxima, 'para fecha', fechaInicioMasProxima);
         }
 
-        // Seleccionar la clase activa o la más próxima
         const claseSeleccionada = claseActiva || claseMasProxima;
         if (claseSeleccionada) {
+          console.log('[Transmision] Clase seleccionada final:', claseSeleccionada.nombre_asignatura);
           setIdClase(claseSeleccionada.id_clase);
           setNombreClase(claseSeleccionada.nombre_asignatura);
+          setNombreAula(aulaSeleccionada); // <-- guardamos nombre del aula
 
-          // Cargar estudiantes de la clase seleccionada
-          const estudiantesData = await obtenerEstudiantes(claseSeleccionada.id_clase);
-          setEstudiantes(estudiantesData);
+          const estuds = await obtenerEstudiantes(claseSeleccionada.id_clase);
+          console.log('[Transmision] Estudiantes cargados:', estuds);
+          setEstudiantes(estuds);
         } else {
           setError('No hay clases próximas programadas.');
           setCargando(false);
@@ -143,16 +144,19 @@ const PaginaTransmision: React.FC = () => {
   // Cargar estado inicial de transmisión y asistencias
   const cargarDatosTransmision = async () => {
     if (!idClase) return;
-
+    console.log('[Transmision] cargarDatosTransmision → idClase=', idClase);
     setCargando(true);
     setError('');
     try {
-      const estadoTransmision = await verificarEstadoTransmision(idClase);
-      setHayTransmision(estadoTransmision.transmitir);
-      setMostrarVideo(estadoTransmision.transmitir);
+      const estado = await verificarEstadoTransmision(idClase);
+      console.log('[Transmision] verificarEstadoTransmision result:', estado);
+      setHayTransmision(estado.transmitir);
+      setMostrarVideo(estado.transmitir);
 
-      if (estadoTransmision.transmitir) {
+      if (estado.transmitir) {
         const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
+        console.log('[Transmision] Asistencias actuales:', asistencia);
+  
         setRegistros(asistencia.registros || []);
       } else {
         setRegistros([]);
@@ -166,15 +170,13 @@ const PaginaTransmision: React.FC = () => {
   };
 
   useEffect(() => {
-    if (idClase) {
-      cargarDatosTransmision();
-    }
+    if (idClase) cargarDatosTransmision();
   }, [idClase]);
 
   // Actualizar asistencias solo cuando hay transmisión
   useEffect(() => {
     if (idClase && hayTransmision) {
-      const intervalAsistencias = setInterval(async () => {
+      const intervalo = setInterval(async () => {
         try {
           const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
           setRegistros(asistencia.registros || []);
@@ -182,135 +184,212 @@ const PaginaTransmision: React.FC = () => {
           console.error('Error al actualizar asistencias:', err);
         }
       }, 5000);
-
-      return () => clearInterval(intervalAsistencias);
+      return () => clearInterval(intervalo);
     }
   }, [idClase, hayTransmision]);
 
-  // Verificar estado de transmisión periódicamente
+  // Verificar estado de transmisión cada 5 segundos
   useEffect(() => {
-    if (idClase) {
-      const intervalTransmision = setInterval(async () => {
-        try {
-          const estadoTransmision = await verificarEstadoTransmision(idClase);
-          setHayTransmision(estadoTransmision.transmitir);
-          if (!estadoTransmision.transmitir) {
-            setRegistros([]);
-          }
-        } catch (err) {
-          console.error('Error al verificar estado de transmisión:', err);
-          setHayTransmision(false);
+    if (!idClase) return;
+    const intervalo = setInterval(async () => {
+      try {
+        const estado = await verificarEstadoTransmision(idClase);
+        setHayTransmision(estado.transmitir);
+        if (!estado.transmitir) {
           setRegistros([]);
+          setMostrarVideo(false);
         }
-      }, 10000);
-
-      return () => clearInterval(intervalTransmision);
-    }
+      } catch (err) {
+        console.error('Error al verificar estado de transmisión:', err);
+        setHayTransmision(false);
+        setRegistros([]);
+        setMostrarVideo(false);
+      }
+    }, 5000);
+    return () => clearInterval(intervalo);
   }, [idClase]);
 
-  // Manejar cambio de estado
+  // Cuando la transmisión termina, limpiamos inmediatamente
+  useEffect(() => {
+    if (!hayTransmision) {
+      setRegistros([]);
+      setMostrarVideo(false);
+    }
+  }, [hayTransmision]);
+
+  // Manejar corrección manual de estado
   const handleCorregirEstado = async (idEstudiante: string, nuevoEstado: string) => {
     if (!idClase) return;
-
     try {
       await actualizarEstadoAsistencia(idEstudiante, idClase, fechaActual, nuevoEstado);
       const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
       setRegistros(asistencia.registros || []);
-    } catch (err) {
-      console.error('Error al actualizar estado:', err);
+    } catch {
       alert('Error al actualizar el estado del estudiante');
     }
   };
 
   // Obtener nombre completo del estudiante
   const obtenerNombreEstudiante = (idEstudiante: string) => {
-    const estudiante = estudiantes.find((e) => e.id_estudiante === idEstudiante);
-    return estudiante ? `${estudiante.nombre} ${estudiante.apellido}` : idEstudiante;
+    const e = estudiantes.find((x) => x.id_estudiante === idEstudiante);
+    return e ? `${e.nombre} ${e.apellido}` : idEstudiante;
   };
 
-  // Formatear fecha_deteccion a un formato legible
+  // Formatear fecha de detección
   const formatearFechaDeteccion = (fecha: string | null) => {
-    if (!fecha) return 'N/A';
-    const fechaObj = new Date(fecha);
-    return formatInTimeZone(fechaObj, 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
+    if (!fecha) return '-';
+    return formatInTimeZone(new Date(fecha), 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
   };
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4">Transmisión en Tiempo Real {nombreClase ? `- ${nombreClase}` : ''}</h2>
+      {/* Encabezado con estiloBootstrap mejorado */}
+      <div className="bg-light p-4 rounded shadow mb-4">
+        <h2 className="display-6 fw-bold text-primary mb-0">
+          Transmisión en Tiempo Real
+          {hayTransmision && nombreClase ? ` - ${nombreClase}` : ''}
+          {hayTransmision && nombreAula ? ` (Aula: ${nombreAula})` : ''}
+        </h2>
+      </div>
 
-      {error && <div className="alert alert-danger">{error}</div>}
-      {cargando && <p>Cargando datos...</p>}
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          {error}
+        </div>
+      )}
+      {cargando && <p className="text-muted text-center">Cargando datos...</p>}
 
       {!cargando && idClase && (
         <>
           {/* Sección de video */}
-          <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h4>Video en Tiempo Real</h4>
-              {hayTransmision && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setMostrarVideo(!mostrarVideo)}
-                >
-                  {mostrarVideo ? 'Ocultar Video' : 'Mostrar Video'}
-                </button>
+          <div className="card shadow mb-4">
+            <div className="card-body">
+              <div className="bg-light p-4 rounded shadow mb-4">
+                <h4 className="display-6 fw-bold text-primary mb-0">Video en Tiempo Real</h4>
+              </div>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                {hayTransmision && (
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => setMostrarVideo(!mostrarVideo)}
+                  >
+                    {mostrarVideo ? 'Ocultar Video' : 'Mostrar Video'}
+                  </button>
+                )}
+              </div>
+              {hayTransmision ? (
+                mostrarVideo ? (
+                  <div className="text-center">
+                    <img
+                      src={`${API_BASE}/transmision/video/${idClase}`}
+                      alt="Video en tiempo real"
+                      className="img-fluid rounded border shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-muted text-center">
+                    Video oculto para optimizar el rendimiento. Haz clic en "Mostrar Video" para verlo.
+                  </p>
+                )
+              ) : (
+                <p className="text-muted text-center">
+                  No hay transmisión activa en este momento.
+                </p>
               )}
             </div>
-            {hayTransmision ? (
-              mostrarVideo ? (
-                <div className="text-center">
-                  <img
-                    src={`${API_BASE}/transmision/video/${idClase}`}
-                    alt="Video en tiempo real"
-                    className="img-fluid border rounded"
-                    style={{ maxWidth: '100%' }}
-                  />
-                </div>
-              ) : (
-                <p className="text-muted text-center">Video oculto para optimizar el rendimiento. Haz clic en "Mostrar Video" para verlo.</p>
-              )
-            ) : (
-              <p className="text-muted text-center">No hay transmisión activa en este momento.</p>
-            )}
           </div>
 
           {/* Sección de asistencias */}
-          <div>
-            <h4>Asistencias en Tiempo Real</h4>
-            {registros.length === 0 ? (
-              <p>No hay asistencias registradas para esta clase y fecha.</p>
-            ) : (
-              <table className="table table-striped table-bordered">
-                <thead className="table-primary">
-                  <tr>
-                    <th>Estudiante</th>
-                    <th>Estado</th>
-                    <th>Fecha de Detección</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registros.map((registro) => (
-                    <tr key={registro.id_estudiante}>
-                      <td>{obtenerNombreEstudiante(registro.id_estudiante)}</td>
-                      <td>{registro.estado}</td>
-                      <td>{formatearFechaDeteccion(registro.fecha_deteccion)}</td>
-                      <td>
-                        <select
-                          value={registro.estado}
-                          onChange={(e) => handleCorregirEstado(registro.id_estudiante, e.target.value)}
-                          className="form-select"
-                        >
-                          <option value="confirmado">Confirmado</option>
-                          <option value="ausente">Ausente</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="card shadow">
+            <div className="card-body">
+              <div className="bg-light p-4 rounded shadow mb-4">
+                <h4 className="display-6 fw-bold text-primary mb-0">
+                  Asistencias en Tiempo Real{' '}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 align-baseline"
+                    style={{ fontSize: '1.2rem' }}
+                    onClick={() => setShowInfo(!showInfo)}
+                  >
+                    ℹ️
+                  </button>
+                </h4>
+              </div>
+
+              {showInfo && (
+                <p className="text-muted small mb-3">
+                  Las detecciones que lleguen después de 10 minutos desde el inicio se marcarán automáticamente como <strong>"Tarde"</strong>.
+                </p>
+              )}
+
+              {registros.length === 0 ? (
+                <p className="text-muted text-center">
+                  No hay asistencias registradas para esta clase y fecha.
+                </p>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-striped table-hover align-middle">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Estudiante</th>
+                        <th>Estado</th>
+                        <th>Fecha de Detección</th>
+                        <th>Fecha de Detección Tardía</th>
+                        <th>Fecha de Modificación</th>
+                        <th>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registros.map((registro) => (
+                        <tr key={registro.id_estudiante}>
+                          <td>{obtenerNombreEstudiante(registro.id_estudiante)}</td>
+                          <td>
+                            <span
+                              className={`badge ${
+                                registro.estado === 'confirmado'
+                                  ? 'bg-success'
+                                  : registro.estado === 'tarde'
+                                  ? 'bg-warning'
+                                  : 'bg-danger'
+                              }`}
+                            >
+                              {registro.estado === 'confirmado'
+                                ? 'Confirmado'
+                                : registro.estado === 'tarde'
+                                ? 'Tarde'
+                                : 'Ausente'}
+                            </span>
+                          </td>
+                          <td>{formatearFechaDeteccion(registro.fecha_deteccion)}</td>
+                          <td>{formatearFechaDeteccion(registro.fecha_deteccion_tardia)}</td>
+                          <td>{formatearFechaDeteccion(registro.modificado_fecha)}</td>
+                          <td>
+                            <select
+                              value={registro.estado}
+                              onChange={(e) =>
+                                handleCorregirEstado(registro.id_estudiante, e.target.value)
+                              }
+                              className="form-select form-select-sm"
+                            >
+                              <option value="confirmado">Confirmado</option>
+                              <option value="tarde">Tarde</option>
+                              <option value="ausente">Ausente</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {hayTransmision && (
+                <div className="d-flex justify-content-end mt-3">
+                  <button className="btn btn-primary">
+                    Confirmar
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

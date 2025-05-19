@@ -4,9 +4,10 @@ from src.servidor.api import ns
 
 registro_model = ns.model("Registro", {
     "id_estudiante": fields.String(description="ID del estudiante"),
-    "estado": fields.String(description="Estado de asistencia", enum=["confirmado", "duda", "ausente"]),
+    "estado": fields.String(description="Estado de asistencia", enum=["confirmado", "tarde", "ausente"]),  # Actualizar enum
     "confianza": fields.Float(description="Confianza de la detección"),
     "fecha_deteccion": fields.String(description="Fecha y hora en que fue detectado automáticamente"),
+    "fecha_deteccion_tardia": fields.String(description="Fecha y hora en que fue detectado tardíamente", required=False),  # Nuevo campo
     "modificado_por_usuario": fields.String(description="ID del usuario que modificó el estado"),
     "modificado_fecha": fields.String(description="Fecha y hora de la modificación manual")
 })
@@ -17,4 +18,3 @@ asistencia_model = ns.model("Asistencia", {
     "fecha": fields.String(description="Fecha de la asistencia"),
     "registros": fields.List(fields.Nested(registro_model))
 })
-

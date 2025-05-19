@@ -1,4 +1,5 @@
 // src/components/EstudianteCard.tsx
+import noPhoto from '../../assets/no-photo.avif'; 
 
 interface Props {
   nombre: string;
@@ -10,6 +11,14 @@ interface Props {
 }
 
 function EstudianteCard({ nombre, apellido, fotoBase64, fotoMimetype, idEstudiante, onClick }: Props) {
+  // Función para obtener la URL de la imagen o la imagen por defecto
+  const getImagenSrc = (): string => {
+    if (fotoBase64 && fotoMimetype) {
+      return `data:${fotoMimetype};base64,${fotoBase64}`;
+    }
+    return noPhoto; // Usar imagen por defecto si no hay fotoBase64 o fotoMimetype
+  };
+
   return (
     <div
       className="card shadow-sm text-center h-100"
@@ -29,33 +38,19 @@ function EstudianteCard({ nombre, apellido, fotoBase64, fotoMimetype, idEstudian
       }}
     >
       <div className="card-body p-3">
-        {fotoBase64 ? (
-          <img
-            src={`data:${fotoMimetype || 'image/jpeg'};base64,${fotoBase64}`}
-            alt={`Foto de ${nombre}`}
-            className="rounded-circle mb-3"
-            style={{ width: '80px', height: '80px', objectFit: 'cover', border: '2px solid #007bff' }}
-            onError={(e) => {
-              // Si la imagen no se puede cargar, mostrar el placeholder
-              e.currentTarget.src = 'https://via.placeholder.com/150?text=Sin+Foto';
-            }}
-          />
-        ) : (
-          <div
-            className="rounded-circle bg-light d-flex align-items-center justify-content-center mb-3"
-            style={{ width: '80px', height: '80px', border: '2px solid #007bff' }}
-          >
-            <i className="bi bi-person-fill text-muted" style={{ fontSize: '40px' }}></i>
-          </div>
-        )}
+        <img
+          src={getImagenSrc()}
+          alt={fotoBase64 ? `${nombre}` : 'Sin Foto'}
+          className="rounded-circle mb-3"
+          style={{ width: '80px', height: '80px', objectFit: 'cover', border: '2px solid #007bff' }}
+          onError={(e) => {
+            e.currentTarget.onerror = null; 
+            e.currentTarget.src = noPhoto; 
+          }}
+        />
         <h6 className="card-title mb-1" style={{ color: '#333', fontWeight: '600' }}>
           {nombre} {apellido}
         </h6>
-        {idEstudiante && (
-          <small className="text-muted d-block" style={{ fontSize: '0.85rem' }}>
-            ID: {idEstudiante}
-          </small>
-        )}
         {onClick && (
           <button
             className="btn btn-primary mt-2"

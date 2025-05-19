@@ -1,13 +1,15 @@
 // src/pages/admin/PaginaEditarHorarios.tsx
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Horario, Clase, Aula, Asignatura, Profesor } from '../../types/horarios';
 import { obtenerClasePorId, actualizarHorarios, obtenerClasesPorProfesor, obtenerAulas, obtenerAsignaturas, obtenerProfesores } from '../../state/api';
 import EditarHorarios from '../../components/admin/EditarHorarios';
 
 const PaginaEditarHorarios: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { idClase } = location.state || {}; // Obtener el ID desde el estado
+
   const [clase, setClase] = useState<Clase | null>(null);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [aulas, setAulas] = useState<Aula[]>([]);
@@ -25,7 +27,7 @@ const PaginaEditarHorarios: React.FC = () => {
       setCargando(true);
       setError(null);
 
-      if (!id) {
+      if (!idClase) {
         setError('ID de clase no proporcionado');
         setCargando(false);
         navigate('/admin/horarios');
@@ -34,7 +36,7 @@ const PaginaEditarHorarios: React.FC = () => {
 
       try {
         // Cargar la clase
-        const claseData = await obtenerClasePorId(id);
+        const claseData = await obtenerClasePorId(idClase);
         setClase(claseData);
         setHorarios(claseData.horarios);
 
@@ -72,14 +74,14 @@ const PaginaEditarHorarios: React.FC = () => {
       }
     };
     cargarDatos();
-  }, [id, navigate]);
+  }, [idClase, navigate]);
 
   // Temporizador para limpiar mensajes de éxito y error
   useEffect(() => {
     if (mensajeExito) {
       const timer = setTimeout(() => {
         setMensajeExito(null);
-      }, 5000); // 5 segundos
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [mensajeExito]);
@@ -88,21 +90,20 @@ const PaginaEditarHorarios: React.FC = () => {
     if (error) {
       const timer = setTimeout(() => {
         setError(null);
-      }, 5000); // 5 segundos
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [error]);
 
   const handleSave = async (nuevosHorarios: Horario[]) => {
-    if (!id) return;
+    if (!idClase) return;
 
     setCargando(true);
     setError(null);
     setMensajeExito(null);
     try {
-      await actualizarHorarios(id, nuevosHorarios);
-      // Actualizar los horarios en el estado para reflejar los cambios
-      const claseActualizada = await obtenerClasePorId(id);
+      await actualizarHorarios(idClase, nuevosHorarios);
+      const claseActualizada = await obtenerClasePorId(idClase);
       setHorarios(claseActualizada.horarios);
       setMensajeExito('Horarios actualizados correctamente');
     } catch (err: any) {
