@@ -1,7 +1,7 @@
 v=0
-o=- 0 0 IN IP4 10.192.65.77
+o=- 0 0 IN IP4 192.168.37.166
 s=H264 Low-Latency Stream
-c=IN IP4 10.192.65.77
+c=IN IP4 192.168.37.166
 t=0 0
 a=tool:GStreamer
 a=type:broadcast

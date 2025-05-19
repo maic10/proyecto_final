@@ -1,5 +1,5 @@
 // src/utils/constants.ts
-export const API_BASE = 'http://127.0.0.1:5000/api';
+export const API_BASE = 'http://192.168.1.18:5000/api';
 
 export const DIAS_SEMANA = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 

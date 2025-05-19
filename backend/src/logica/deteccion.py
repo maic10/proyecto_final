@@ -26,11 +26,11 @@ class Detections:
         self.cls = cls
 
 class FaceTracker:
-    def __init__(self, frame_rate=30, embeddings_dict=None, detect_every_n=1, similarity_threshold=0.45, verbose=False):
+    def __init__(self, frame_rate=30, embeddings_dict=None, detect_every_n=1, similarity_threshold=0.5, verbose=False, resolucion=(1024 , 768   )):
         logger.info("Cargando modelo Buffalo para detección...")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.detector = FaceAnalysis(name="buffalo_sc", providers=['CUDAExecutionProvider'] if self.device == 'cuda' else ['CPUExecutionProvider'])
-        self.detector.prepare(ctx_id=0, det_size=(640, 480))
+        self.detector.prepare(ctx_id=0, det_size=resolucion)
         logger.info(f"Modelo cargado exitosamente en {self.device}.")
 
         self.tracker = BYTETracker(args, frame_rate=frame_rate)       
@@ -83,8 +83,8 @@ class FaceTracker:
             fps = self.frame_count / elapsed_time if elapsed_time > 0 else 0.0  # Mostrar valor intermedio
         
         # Dibujar FPS en el frame
-        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        #cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        cv2.putText(frame, f"FPS: {fps:.2f}", (80, 80), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 0, 0), 3)
         return frame
 
     def identify_faces(self, faces, tracked_objects):
@@ -154,33 +154,38 @@ class FaceTracker:
 
     def draw_tracking_info(self, frame, face_assignments, identified):
         """Dibuja los resultados de rostros identificados o desconocidos en el frame, con diseño mejorado."""
+        h_frame, w_frame = frame.shape[:2]
         for track_id, bbox in face_assignments.items():
             x1, y1, x2, y2 = bbox
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(640, x2)
-            y2 = min(480, y2)
+            x1 = max(0, min(x1, w_frame - 1))
+            y1 = max(0, min(y1, h_frame - 1))
+            x2 = max(0, min(x2, w_frame - 1))
+            y2 = max(0, min(y2, h_frame - 1))
 
             color = (0, 255, 0)  # verde 
             if track_id in identified and identified[track_id][0] == "Desconocido":
                 color = (0, 0, 255)  # Rojo para desconocidos
 
             # Dibujar el rectángulo
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)  # grosor de línea 1
+            #cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)  # grosor de línea 1
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 5)  # grosor de línea 1
 
             # Dibujar círculos pequeños en las esquinas
-            radius = 3  # Tamaño del círculo
+            #radius = 1  # Tamaño del círculo
+            radius = 4  # Tamaño del círculo
             thickness = -1  # -1 para círculo relleno
             black = (255, 0, 0)  # Color azul
             for (cx, cy) in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
                 cv2.circle(frame, (cx, cy), radius, black, thickness)
 
             # Preparar y dibujar el texto
+            """ 
             label = f"ID: {track_id}"
             if track_id in identified:
                 label += f" - {identified[track_id][0]}"
-            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-
+            #cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 2.5, color, 3)
+            """
         return frame
 
 
@@ -191,11 +196,7 @@ class FaceTracker:
         # Asegurarse de que el frame sea escribible
         frame = frame.copy()  
 
-        # Redimensionar el frame si es necesario
-        if frame.shape[:2] != (640, 480):
-            frame_resized = cv2.resize(frame, (640, 480))
-        else:
-            frame_resized = frame
+        frame_resized = frame
 
         # Limitar el procesamiento a cada N frames (detect_interval)
         if self.frame_count % self.detect_interval == 0:
@@ -243,7 +244,7 @@ class FaceTracker:
         frame_resized = self.draw_tracking_info(frame_resized, face_assignments, identified)
 
         # Actualizar y dibujar FPS
-        frame_resized = self.update_fps(frame_resized)
+        #frame_resized = self.update_fps(frame_resized)
 
         return frame_resized
 
@@ -255,7 +256,7 @@ if __name__ == "__main__":
     embeddings_dict = embeddings_gen.load_and_generate_embeddings()
     #logger.info(f"Embeddings generados: {embeddings_dict["perfil"] }")
     
-    tracker = FaceTracker(embeddings_dict=embeddings_dict, verbose=False, detect_every_n=3)
+    tracker = FaceTracker(embeddings_dict=embeddings_dict, frame_rate=30, detect_every_n=3)
 
     print("Selecciona la fuente de video:")
     print("  - Ingresa '0' para usar la cámara.")
@@ -276,6 +277,20 @@ if __name__ == "__main__":
         print("Error: No se pudo abrir la fuente de video.")
         exit()
 
+    # crear ventana redimensionable y mostrar a pantalla completa (o arrástrala)
+    cv2.namedWindow("Test - Seguimiento de Rostros", cv2.WINDOW_NORMAL)
+    # Opcional: arrancar en modo pantalla completa
+    cv2.setWindowProperty(
+      "Test - Seguimiento de Rostros",
+      cv2.WND_PROP_FULLSCREEN,
+      cv2.WINDOW_FULLSCREEN
+    )
+
+    #fps = cap.get(cv2.CAP_PROP_FPS)
+    #if fps <= 0:
+    #    fps = 30  # fallback razonable
+    #delay_ms = int(1000 / fps)
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -283,9 +298,20 @@ if __name__ == "__main__":
             break
 
         processed_frame = tracker.process_frame(frame)
+
+        # redimensionar para mostrar en ventana 640x480 maximo
+        #h, w = processed_frame.shape[:2]
+        #max_w, max_h = 640, 480
+        #scale = min(max_w / w, max_h / h)
+        #display_frame = cv2.resize(
+        #    processed_frame,
+        #    (int(w * scale), int(h * scale))
+        #)
+
         cv2.imshow("Test - Seguimiento de Rostros", processed_frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
+        #if cv2.waitKey(delay_ms) & 0xFF == ord('q'):
             break
 
     cap.release()

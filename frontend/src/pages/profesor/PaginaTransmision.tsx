@@ -34,6 +34,7 @@ const PaginaTransmision: React.FC = () => {
   // Cargar clases y determinar la clase activa o más próxima
   useEffect(() => {
     const cargarDatosIniciales = async () => {
+      console.log('[Transmision] Iniciando carga de datos iniciales');
       const usuario = obtenerUsuario();
       if (!usuario) {
         navigate('/');
@@ -42,6 +43,7 @@ const PaginaTransmision: React.FC = () => {
 
       try {
         const clasesData = await obtenerClases(usuario.id_usuario);
+        console.log('[Transmision] Clases obtenidas:', clasesData);
         if (clasesData.length === 0) {
           setError('No tienes clases asignadas.');
           setCargando(false);
@@ -52,7 +54,7 @@ const PaginaTransmision: React.FC = () => {
 
         const ahora = new Date();
         const diaActual = ahora.getDay();
-        const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+        const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
         const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
 
         let claseActiva: Clase | null = null;
@@ -62,6 +64,7 @@ const PaginaTransmision: React.FC = () => {
 
         // Buscar clase activa hoy
         for (const clase of clasesData) {
+          console.log(`[Transmision] Revisando horarios de ${clase.nombre_asignatura}`, clase.horarios);
           for (const horario of clase.horarios) {
             const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
             if (diaHorario !== diaActual) continue;
@@ -75,9 +78,13 @@ const PaginaTransmision: React.FC = () => {
               ? (horaActual >= inicioSeg || horaActual <= finSeg)
               : (inicioSeg <= horaActual && horaActual <= finSeg);
             if (!dentro) continue;
+            
+            console.log(`[Transmision] Está dentro del horario ${horario.dia} ${horario.hora_inicio}-${horario.hora_fin}`);
 
             const estado = await verificarEstadoTransmision(clase.id_clase);
+            console.log(`[Transmision] Estado transmisión para ${clase.id_clase}:`, estado);
             if (estado.transmitir) {
+              console.log('[Transmision] Clase activa encontrada:', clase.nombre_asignatura);
               claseActiva = clase;
               aulaSeleccionada = horario.nombre_aula; // guardamos aula de este horario
               break;
@@ -88,6 +95,7 @@ const PaginaTransmision: React.FC = () => {
 
         // Si no hay transmisión activa, buscar próxima clase
         if (!claseActiva) {
+          console.log('[Transmision] No hay transmisión activa, buscando próxima clase');
           for (const clase of clasesData) {
             for (const horario of clase.horarios) {
               const diaHorario = diasSemana.indexOf(horario.dia.toLowerCase());
@@ -106,15 +114,18 @@ const PaginaTransmision: React.FC = () => {
               }
             }
           }
+          console.log('[Transmision] Próxima clase:', claseMasProxima, 'para fecha', fechaInicioMasProxima);
         }
 
         const claseSeleccionada = claseActiva || claseMasProxima;
         if (claseSeleccionada) {
+          console.log('[Transmision] Clase seleccionada final:', claseSeleccionada.nombre_asignatura);
           setIdClase(claseSeleccionada.id_clase);
           setNombreClase(claseSeleccionada.nombre_asignatura);
           setNombreAula(aulaSeleccionada); // <-- guardamos nombre del aula
 
           const estuds = await obtenerEstudiantes(claseSeleccionada.id_clase);
+          console.log('[Transmision] Estudiantes cargados:', estuds);
           setEstudiantes(estuds);
         } else {
           setError('No hay clases próximas programadas.');
@@ -133,16 +144,19 @@ const PaginaTransmision: React.FC = () => {
   // Cargar estado inicial de transmisión y asistencias
   const cargarDatosTransmision = async () => {
     if (!idClase) return;
-
+    console.log('[Transmision] cargarDatosTransmision → idClase=', idClase);
     setCargando(true);
     setError('');
     try {
       const estado = await verificarEstadoTransmision(idClase);
+      console.log('[Transmision] verificarEstadoTransmision result:', estado);
       setHayTransmision(estado.transmitir);
       setMostrarVideo(estado.transmitir);
 
       if (estado.transmitir) {
         const asistencia = await obtenerAsistenciasActual(idClase, fechaActual);
+        console.log('[Transmision] Asistencias actuales:', asistencia);
+  
         setRegistros(asistencia.registros || []);
       } else {
         setRegistros([]);
@@ -223,7 +237,7 @@ const PaginaTransmision: React.FC = () => {
 
   // Formatear fecha de detección
   const formatearFechaDeteccion = (fecha: string | null) => {
-    if (!fecha) return 'N/A';
+    if (!fecha) return '-';
     return formatInTimeZone(new Date(fecha), 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
   };
 
@@ -314,13 +328,13 @@ const PaginaTransmision: React.FC = () => {
                 </p>
               ) : (
                 <div className="table-responsive">
-                  <table className="table table-striped table-bordered table-hover">
-                    <thead className="table-primary">
+                  <table className="table table-striped table-hover align-middle">
+                    <thead className="table-light">
                       <tr>
                         <th>Estudiante</th>
                         <th>Estado</th>
-                        <th>Fecha de Detección (A tiempo)</th>
-                        <th>Fecha de Detección (Tardía)</th>
+                        <th>Fecha de Detección</th>
+                        <th>Fecha de Detección Tardía</th>
                         <th>Fecha de Modificación</th>
                         <th>Acción</th>
                       </tr>
@@ -366,6 +380,13 @@ const PaginaTransmision: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {hayTransmision && (
+                <div className="d-flex justify-content-end mt-3">
+                  <button className="btn btn-primary">
+                    Confirmar
+                  </button>
                 </div>
               )}
             </div>

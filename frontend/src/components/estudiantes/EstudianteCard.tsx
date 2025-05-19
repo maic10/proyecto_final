@@ -51,11 +51,6 @@ function EstudianteCard({ nombre, apellido, fotoBase64, fotoMimetype, idEstudian
         <h6 className="card-title mb-1" style={{ color: '#333', fontWeight: '600' }}>
           {nombre} {apellido}
         </h6>
-        {idEstudiante && (
-          <small className="text-muted d-block" style={{ fontSize: '0.85rem' }}>
-            ID: {idEstudiante}
-          </small>
-        )}
         {onClick && (
           <button
             className="btn btn-primary mt-2"
