@@ -1,29 +1,132 @@
+// src/App.tsx
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import PaginaInicioSesion from './pages/PaginaInicioSesion';
-import PaginaPrincipal from './pages/PaginaPrincipal';
-import BarraNavegacion from './components/BarraNavegacion';
-import PaginaEstudiantes from './pages/PaginaEstudiantes';
-import PaginaAsistencias from './pages/PaginaAsistencias';
-import PaginaAsistenciaDetalle from './pages/PaginaAsistenciaDetalle';
-import RutaPrivada from './components/RutaPrivada';
+import BarraNavegacion from './components/common/BarraNavegacion';
+import RutaPrivada from './components/common/RutaPrivada';
+import { AuthProvider } from './state/AuthProvider'; 
+import PaginaInicioSesion from './pages/common/PaginaInicioSesion';
+import PaginaPrincipal from './pages/profesor/PaginaPrincipal';
+import PaginaEstudiantes from './pages/profesor/PaginaEstudiantes';
+import PaginaAsistencias from './pages/profesor/PaginaHistorialAsistencias';
+import PaginaAsistenciaDetalle from './pages/profesor/PaginaAsistenciaDetalle';
+import PaginaTransmision from './pages/profesor/PaginaTransmision';
+import PaginaPrincipalAdmin from './pages/admin/PaginaPrincipalAdmin';
+import PaginaGestionarEstudiantes from './pages/admin/PaginaGestionarEstudiantes';
+import PaginaCrearEstudiante from './pages/admin/PaginaCrearEstudiante';
+import PaginaEditarEstudiante from './pages/admin/PaginaEditarEstudiante';
+import GestionarHorarios from './pages/admin/GestionarHorarios';
+import PaginaEditarHorarios from './pages/admin/PaginaEditarHorarios';
+import PaginaPerfil from './pages/profesor/PaginaPerfil';
 import { estaAutenticado } from './state/auth';
 
+
 function AppWrapper() {
-  const location = useLocation(); // Contiene información de la ruta actural
-  // Mostrar la barra de navegación si no estamos en la página de inicio y el usuario está autenticado
+  const location = useLocation();
   const mostrarBarra = location.pathname !== '/' && estaAutenticado();
 
   return (
     <>
-      {mostrarBarra && <BarraNavegacion />}  {/* Mostrar la barra de navegación si mostrarBarra es verdadero */ }
+      {mostrarBarra && <BarraNavegacion />}
       <Routes>
         <Route path="/" element={<PaginaInicioSesion />} />
-        <Route path="/inicio" element={<RutaPrivada><PaginaPrincipal /></RutaPrivada>} />
-        <Route path="/estudiantes" element={<RutaPrivada><PaginaEstudiantes /></RutaPrivada>} />
-        <Route path="/asistencias" element={<RutaPrivada><PaginaAsistencias /></RutaPrivada>} />
-        <Route path="/asistencias/detalle" element={<RutaPrivada><PaginaAsistenciaDetalle /></RutaPrivada>} />
-        {/* Agregar una ruta para manejar 404 */}
-        <Route path="*" element={<div><h2>404 - Página no encontrada</h2><p>La ruta {location.pathname} no existe.</p></div>} />
+        {/* Rutas para profesores */}
+        <Route
+          path="/inicio"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaPrincipal />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/estudiantes"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaEstudiantes />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/asistencias"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaAsistencias />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/asistencias/detalle"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaAsistenciaDetalle />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/transmision"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaTransmision />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <RutaPrivada roles={['profesor']}>
+              <PaginaPerfil />
+            </RutaPrivada>
+          }
+        />
+        {/* Rutas para administradores */}
+        <Route
+          path="/admin"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaPrincipalAdmin />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/estudiantes"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaGestionarEstudiantes />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/estudiantes/crear"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaCrearEstudiante />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/estudiantes/editar"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaEditarEstudiante />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/horarios"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <GestionarHorarios />
+            </RutaPrivada>
+          }
+        />
+        <Route
+          path="/admin/horarios/editar"
+          element={
+            <RutaPrivada roles={['admin']}>
+              <PaginaEditarHorarios />
+            </RutaPrivada>
+          }
+        />
+        <Route path="*" element={<div className="container py-5"><h2>404 - Página no encontrada</h2><p>La ruta {location.pathname} no existe.</p></div>} />
       </Routes>
     </>
   );
@@ -32,7 +135,9 @@ function AppWrapper() {
 function App() {
   return (
     <Router>
-      <AppWrapper />
+      <AuthProvider>
+        <AppWrapper />
+      </AuthProvider>
     </Router>
   );
 }

@@ -5,9 +5,7 @@ import os
 ruta_proyecto = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(ruta_proyecto)
 
-#print(sys.path)  # Verifica que la ruta esté en el PYTHONPATH
-
-from src.servidor.api import app  # Relativo desde src/servidor/
+from src.servidor.api import app
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", threaded=True)  
