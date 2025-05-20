@@ -1,4 +1,3 @@
-// src/pages/profesor/PaginaHistorialAsistencias.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
@@ -10,7 +9,12 @@ import {
 import { Clase } from '../../types/clases';
 import { AsistenciaResumen } from '../../types/asistencias';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 10; // Número de items por página
+
+/**
+ * Página para que el profesor consulte el historial de asistencias de sus clases.
+ * Permite filtrar por fechas y clase, paginar, ordenar y exportar los resultados.
+ */
 
 function PaginaHistorialAsistencias() {
   const [clases, setClases] = useState<Clase[]>([]);
@@ -32,25 +36,27 @@ function PaginaHistorialAsistencias() {
 
   const navigate = useNavigate();
 
-  // Maneja el clic en "Buscar"
+  // Maneja el clic en "Buscar" y recarga el listado de asistencias
   const handleBuscar = () => {
     setPaginaActual(1);
     cargarListado();
   };
 
-  // Alterna orden
+  // Alterna el orden de las asistencias por fecha
   const handleOrdenar = () => setOrdenAscendente(!ordenAscendente);
 
-  // Lanza el diálogo de exportar
+  // Lanza el diálogo de exportar asistencias
   const handleMostrarExportar = () => setMostrarDialogoExportar(true);
   const handleCancelarExportar = () => setMostrarDialogoExportar(false);
 
-  // Confirma y descarga
+  // Genera el nombre del archivo de exportación según la fecha y formato
   const generarNombreArchivo = () => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     return `asistencia_${pad(now.getDate())}${pad(now.getMonth()+1)}${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}.${formatoExportacion}`;
   };
+
+  // Confirma la exportación y descarga el archivo
   const handleConfirmarExportar = async () => {
     setMostrarDialogoExportar(false);
     try {
@@ -72,7 +78,7 @@ function PaginaHistorialAsistencias() {
     }
   };
 
-  // Carga el listado de asistencias
+  // Carga el listado de asistencias según los filtros seleccionados
   const cargarListado = async () => {
     if (!mostrarTodas && (!fechaInicio || !fechaFin)) {
       setError('Selecciona un rango de fechas o activa "Mostrar todas".');
@@ -101,7 +107,7 @@ function PaginaHistorialAsistencias() {
     }
   };
 
-  // Carga clases al montar
+  // Carga las clases del profesor al montar el componente
   useEffect(() => {
     (async () => {
       setCargando(true);
@@ -123,7 +129,7 @@ function PaginaHistorialAsistencias() {
     })();
   }, [navigate]);
 
-  // Reordena cada vez que cambian asistencias u orden
+  // Ordena las asistencias cada vez que cambian los datos o el orden
   useEffect(() => {
     const ordenadas = [...asistencias].sort((a, b) => {
       const tA = new Date(a.fecha).getTime();

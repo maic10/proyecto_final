@@ -6,10 +6,12 @@ function BarraNavegacion() {
   const usuario = obtenerUsuario();
   const navigate = useNavigate();
 
+  // Si no hay usuario autenticado, no se muestra la barra de navegación
   if (!usuario) return null;
 
   const isAdmin = usuario.rol === 'admin';
 
+  // Maneja el cierre de sesión: elimina los datos y redirige al inicioç
   const handleLogout = () => {
     cerrarSesion();
     navigate('/');

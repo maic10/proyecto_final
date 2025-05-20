@@ -1,7 +1,9 @@
-// src/pages/admin/PaginaPrincipalAdmin.tsx
 import { Link } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
 
+/**
+ * Página principal del administrador.
+ */ 
 function PaginaPrincipalAdmin() {
   const user = obtenerUsuario();
 

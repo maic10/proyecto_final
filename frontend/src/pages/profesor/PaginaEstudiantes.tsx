@@ -10,6 +10,10 @@ import { Clase } from '../../types/clases';
 import { Estudiante } from '../../types/estudiantes';
 import { Asistencia, ResumenAsistencias } from '../../types/asistencias';
 
+/**
+ * Página para que el profesor consulte sus clases y los estudiantes de cada clase.
+ * Permite ver detalles y asistencias recientes de cada estudiante.
+ */
 function PaginaEstudiantes() {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [estudiantesFiltrados, setEstudiantesFiltrados] = useState<Estudiante[]>([]);
@@ -29,7 +33,7 @@ function PaginaEstudiantes() {
   const modalRef = useRef<bootstrap.Modal | null>(null);
   const focusAnchorRef = useRef<HTMLButtonElement>(null);
 
-  // Inicializar el modal
+  // Inicializa el modal de asistencias al montar el componente
   useEffect(() => {
     const modalElement = document.getElementById('asistenciasModal');
     if (modalElement) {
@@ -37,6 +41,7 @@ function PaginaEstudiantes() {
     }
   }, []);
 
+  // Carga las clases asignadas al profesor
   const cargarClases = async () => {
     const usuario = obtenerUsuario();
     if (!usuario) {
@@ -56,6 +61,7 @@ function PaginaEstudiantes() {
     }
   };
 
+  // Carga los estudiantes de la clase seleccionada
   const cargarEstudiantes = async (classId: string) => {
     setCargandoEstudiantes(true);
     try {
@@ -72,7 +78,7 @@ function PaginaEstudiantes() {
     }
   };
 
-  // Filtrar y ordenar estudiantes
+  // Filtra y ordena los estudiantes según búsqueda y orden seleccionados
   useEffect(() => {
     let filtrados = estudiantes;
 
@@ -103,6 +109,7 @@ function PaginaEstudiantes() {
     }
   }, [location.pathname]);
 
+
   const handleClaseClick = (clase: Clase) => {
     setClaseSeleccionada(clase);
     setBusqueda('');
@@ -124,6 +131,7 @@ function PaginaEstudiantes() {
     setOrden(e.target.value as 'asc' | 'desc');
   };
 
+    // Carga y muestra las asistencias recientes de un estudiante
   const handleEstudianteClick = async (estudiante: Estudiante, buttonRef: HTMLButtonElement) => {
     setEstudianteSeleccionado(estudiante);
     setCargandoAsistencias(true);
@@ -173,7 +181,6 @@ function PaginaEstudiantes() {
   };
 
   const handleCloseModal = () => {
-    // Mover el foco al ancla antes de cerrar el modal
     if (focusAnchorRef.current) {
       focusAnchorRef.current.focus();
     }

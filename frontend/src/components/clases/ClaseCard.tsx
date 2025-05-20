@@ -14,6 +14,11 @@ interface ClaseCardProps {
   horarios: Horario[];
 }
 
+/**
+ * Componente visual para mostrar la información de una clase.
+ * Muestra el nombre de la asignatura y la lista de horarios con su aula correspondiente.
+ * Si no hay horarios, muestra un mensaje indicándolo.
+ */
 const ClaseCard: React.FC<ClaseCardProps> = ({ nombreAsignatura, horarios }) => {
   return (
     <div

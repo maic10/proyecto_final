@@ -1,4 +1,3 @@
-// src/state/api.ts
 import axios from 'axios';
 import { obtenerToken, obtenerUsuario, cerrarSesion } from './auth';
 import { API_BASE } from '../utils/constants';
@@ -36,6 +35,7 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+// Permite iniciar sesión
 export async function iniciarSesion(correo: string, contraseña: string) {
   const res = await axiosInstance.post('/autenticacion/iniciar_sesion', {
     correo,
@@ -44,11 +44,13 @@ export async function iniciarSesion(correo: string, contraseña: string) {
   return res;
 }
 
+// Obtener el perfil del usuario autenticado
 export async function obtenerPerfil() {
   const res = await axiosInstance.get('/autenticacion/perfil');
   return res;
 }
 
+// Obtener las clases del usuario autenticado
 export async function obtenerClases(id_usuario: string) {
   const params = { id_usuario };
   const res = await axiosInstance.get('/clases', { params });
@@ -116,17 +118,20 @@ export async function exportarAsistencias(
   return res;
 }
 
+// Obtener asistencias por clase
 export async function obtenerAsistencias(idClase: string) {
   const res = await axiosInstance.get(`/asistencias/${idClase}`);
   return res;
 }
 
+// Obtener asistencias actuales
 export async function obtenerAsistenciasActual(idClase: string, fecha: string) {
   const params = { id_clase: idClase, fecha };
   const res = await axiosInstance.get('/asistencias/actual', { params });
   return res;
 }
 
+// Actualizar el estado de asistencia de un estudiante
 export const actualizarEstadoAsistencia = async (
   idEstudiante: string,
   idClase: string,
@@ -145,12 +150,14 @@ export const actualizarEstadoAsistencia = async (
   });
 };
 
+// Obtener el estado de la transmisión
 export async function verificarEstadoTransmision(idClase: string) {
   const params = { id_clase: idClase };
   const res = await axiosInstance.get('/transmision/estado_web', { params });
   return res;
 }
 
+// Obtener asistencias de un estudiante
 export async function obtenerAsistenciasEstudiante(
   idClase: string,
   idEstudiante: string,
@@ -172,6 +179,7 @@ export async function obtenerAsistenciasEstudiante(
   }
 }
 
+// Obtener datos de un estudiante (incluyendo foto)
 export const obtenerEstudiantes = async (classId?: string, includePhotos: boolean = false) => {
   const usuario = obtenerUsuario();
 
@@ -191,6 +199,7 @@ export const obtenerEstudiantes = async (classId?: string, includePhotos: boolea
   return res;
 };
 
+// Guardar la imagen de un estudiante
 export const subirImagenEstudiante = async (idEstudiante: string, imagen: File) => {
   const formData = new FormData();
   formData.append('imagen', imagen);
@@ -203,41 +212,49 @@ export const subirImagenEstudiante = async (idEstudiante: string, imagen: File) 
   return res;
 };
 
+// Dar de alta un nuevo estudiante
 export const crearEstudiante = async (nombre: string, apellido: string, idsClases: string[]) => {
   const res = await axiosInstance.post('/estudiantes/nuevo', { nombre, apellido, ids_clases: idsClases });
   return res;
 };
 
+// Actualizar los datos de un estudiante
 export const actualizarEstudiante = async (idEstudiante: string, nombre: string, apellido: string, idsClases: string[]) => {
   const res = await axiosInstance.put(`/estudiantes/${idEstudiante}`, { nombre, apellido, ids_clases: idsClases });
   return res;
 };
 
+// Obtener los datos de un estudiante por su ID
 export const obtenerEstudiantePorId = async (idEstudiante: string) => {
   const res = await axiosInstance.get(`/estudiantes/${idEstudiante}`);
   return res;
 };
 
+// Eliminar un estudiante
 export const eliminarEstudiante = async (idEstudiante: string) => {
   const res = await axiosInstance.delete(`/estudiantes/${idEstudiante}`);
   return res;
 };
 
+// Eliminar la imagen de un estudiante
 export const eliminarImagenEstudiante = async (idEstudiante: string, fileId: string) => {
   const res = await axiosInstance.delete(`/estudiantes/${idEstudiante}/imagenes/${fileId}`);
   return res;
 };
 
+// Obtener las asignaturas disponibles
 export const obtenerAsignaturas = async () => {
   const res = await axiosInstance.get('/asignaturas');
   return res;
 };
 
+// Obtener los profesores de una asignatura
 export const obtenerProfesoresPorAsignatura = async (idAsignatura: string) => {
   const res = await axiosInstance.get(`/asignaturas/${idAsignatura}/profesores`);
   return res;
 };
 
+// Obtener clases basadas en asignatura, profesor o ID de clase (para administradores)
 export const obtenerClasesAdmin = async (idAsignatura?: string, idUsuario?: string, idClase?: string) => {
   const params: { [key: string]: string | undefined } = {
     id_asignatura: idAsignatura,
@@ -249,26 +266,30 @@ export const obtenerClasesAdmin = async (idAsignatura?: string, idUsuario?: stri
   return res;
 };
 
+// Obtener los datos de los profesores
 export const obtenerProfesores = async (): Promise<Profesor[]> => {
   const res = await axiosInstance.get('/profesor/profesores');
   return res;
 };
 
-
+// Obtener los datos de una clase por su ID
 export const obtenerClasePorId = async (idClase: string): Promise<Clase> => {
   const res = await axiosInstance.get(`/clases/${idClase}`);
   return res;
 };
 
+// Actualizar los horarios de una clase
 export const actualizarHorarios = async (idClase: string, horarios: Horario[]): Promise<void> => {
   await axiosInstance.put(`/clases/${idClase}/horarios`, { horarios });
 };
 
+// Obtener las aulas disponibles
 export const obtenerAulas = async (): Promise<Aula[]> => {
   const res = await axiosInstance.get('/aulas');
   return res;
 };
 
+// Filtrar estudiantes por profesor y/o asignatura (solo para administradores)
 export const filtrarEstudiantes = async (
   idProfesor?: string,
   idAsignatura?: string,
@@ -287,14 +308,17 @@ export const filtrarEstudiantes = async (
   }
 };
 
+// Obtener las clases de un profesor específico
 export const obtenerClasesPorProfesor = async (profesorId: string): Promise<Clase[]> => {
   return await obtenerClasesAdmin(undefined, profesorId, undefined);
 };
 
+// Obtener las clases de una asignatura específica
 export const obtenerClasesPorAsignatura = async (asignaturaId: string): Promise<Clase[]> => {
   return await obtenerClasesAdmin(asignaturaId, undefined, undefined);
 };
 
+// Permite ajustar el tiempo máximo para detecciones a tiempo.
 export const ajustarTiempoMaximo = async (idClase: string, tiempoMaximo: number) => {
   const response = await axiosInstance.post(`/transmision/tiempo_maximo/${idClase}`, {
     tiempo_maximo: tiempoMaximo,
@@ -302,6 +326,7 @@ export const ajustarTiempoMaximo = async (idClase: string, tiempoMaximo: number)
   return response.data;
 };
 
+// Cambiar la contraseña del usuario autenticado
 export async function cambiarContrasena(contrasenaActual: string, nuevaContrasena: string) {
   const res = await axiosInstance.post('/autenticacion/cambiar_contrasena', {
     contrasenaActual,
@@ -309,9 +334,3 @@ export async function cambiarContrasena(contrasenaActual: string, nuevaContrasen
   });
   return res;
 }
-//export async function obtenerStreamVideo(idClase: string) {
-//  const res = await axiosInstance.get(`/transmision/video/${idClase}`, {
-//    responseType: 'blob', // Obtener la respuesta como un blob para el stream
-//  });
-//  return res; // Devuelve el blob directamente
-//}

@@ -1,7 +1,7 @@
 // src/components/EstudiantesList.tsx
 import React from 'react';
 import EstudianteCard from './EstudianteCard';
-import { Estudiante } from '../../types';
+import { Estudiante } from '../../types/estudiantes';
 
 interface EstudiantesListProps {
   estudiantes: Estudiante[];
@@ -15,6 +15,9 @@ interface EstudiantesListProps {
   cargando: boolean;
 }
 
+/**
+ * Lista de estudiantes con búsqueda, orden y selección.
+ */
 const EstudiantesList: React.FC<EstudiantesListProps> = ({
   estudiantes,
   estudiantesFiltrados,
@@ -28,6 +31,7 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
 }) => {
   return (
     <>
+      {/* Encabezado y controles de búsqueda/orden */}
       <div className="row mb-5 align-items-center">
         <div className="col-md-6">
           <h1 className="display-5 fw-bold text-primary mb-2">
@@ -38,6 +42,7 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
           </p>
         </div>
         <div className="col-md-6 d-flex justify-content-end align-items-center gap-3">
+          {/* Input de búsqueda */}
           <div className="input-group" style={{ maxWidth: '300px' }}>
             <span className="input-group-text bg-white border-end-0">
               <i className="bi bi-search"></i>
@@ -51,6 +56,7 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
               style={{ borderRadius: '0 5px 5px 0' }}
             />
           </div>
+          {/* Selector de orden */}
           <select
             className="form-select"
             style={{ maxWidth: '150px' }}
@@ -60,12 +66,13 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
             <option value="asc">Nombre (A-Z)</option>
             <option value="desc">Nombre (Z-A)</option>
           </select>
+          {/* Botón para volver a la vista de clases */}
           <button className="btn btn-outline-primary" onClick={onVolver}>
             <i className="bi bi-arrow-left me-2"></i>Volver a Clases
           </button>
         </div>
       </div>
-
+       {/* Estado de carga, mensajes y listado de estudiantes */}
       {cargando ? (
         <div className="text-center">
           <div className="spinner-border text-primary" role="status">
@@ -83,6 +90,7 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
         </div>
       ) : (
         <div className="row g-4">
+          {/* Renderiza una tarjeta por cada estudiante filtrado */}
           {estudiantesFiltrados.map((est) => (
             <div key={est.id_estudiante} className="col-6 col-md-4 col-lg-3">
               <div>
@@ -91,7 +99,6 @@ const EstudiantesList: React.FC<EstudiantesListProps> = ({
                   apellido={est.apellido}
                   fotoBase64={est.imagenes?.[0]?.data}
                   fotoMimetype={est.imagenes?.[0]?.mimetype}
-                  //idEstudiante={est.id_estudiante}
                   onClick={(buttonRef) => onEstudianteClick(est, buttonRef)}
                 />
               </div>

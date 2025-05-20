@@ -1,4 +1,3 @@
-// src/components/admin/EditarHorarios.tsx
 import { useState } from 'react';
 import { Horario, Aula } from '../../types/horarios';
 
@@ -47,7 +46,7 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [indexToDelete, setIndexToDelete] = useState<number | null>(null);
 
-  // Validar superposición dentro de la misma clase
+  // Valida si el nuevo horario se superpone con algún horario ya existente en la misma clase
   const validarSuperposicionEnClaseActual = (nuevoHorario: Horario) => {
     for (const horarioExistente of horarios) {
       if (editIndex !== null && horarios[editIndex] === horarioExistente) {
@@ -82,25 +81,22 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
     return null;
   };
 
+   /**
+   * Añade un nuevo horario o actualiza uno existente tras validar reglas de negocio.
+   * Realiza validaciones de día, rango horario, duplicados y superposiciones.
+   */
   const handleAddOrUpdateHorario = async () => {
     setError(null);
 
-    // Validaciones básicas
-    // descomentarlo en prod
-    /*
     if (!diasValidos.includes(nuevoHorario.dia)) {
       setError('El día debe ser de lunes a viernes.');
       return;
     }
-    */
 
-    // descomentarlo en prod
-    /*
     if (nuevoHorario.hora_inicio < '08:00' || nuevoHorario.hora_fin > '22:00') {
       setError('El horario debe estar entre 08:00 y 22:00.');
       return;
     }
-      */
 
     if (nuevoHorario.hora_inicio >= nuevoHorario.hora_fin) {
       setError('La hora de inicio debe ser anterior a la hora de fin.');
@@ -145,16 +141,28 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
     setNuevoHorario({ dia: '', hora_inicio: '', hora_fin: '', id_aula: '' });
   };
 
+  /**
+   * Carga los datos de un horario existente en el formulario para editarlo.
+   * @param index Índice del horario a editar.
+   */
   const handleEditHorario = (index: number) => {
     setEditIndex(index);
     setNuevoHorario(horarios[index]);
   };
 
+  /**
+   * Muestra el modal de confirmación para eliminar un horario.
+   * @param index Índice del horario a eliminar.
+   */  
   const handleDeleteHorario = (index: number) => {
     setIndexToDelete(index);
     setShowConfirmModal(true);
   };
 
+  /**
+   * Confirma la eliminación del horario seleccionado.
+   * Elimina el horario del array y cierra el modal.
+   */
   const confirmDelete = () => {
     if (indexToDelete !== null) {
       const nuevosHorarios = horarios.filter((_, i) => i !== indexToDelete);
@@ -164,12 +172,19 @@ const EditarHorarios: React.FC<EditarHorariosProps> = ({
     }
   };
 
+  /**
+   * Cancela la eliminación de un horario y cierra el modal.
+   */
   const cancelDelete = () => {
     setShowConfirmModal(false);
     setIndexToDelete(null);
   };
 
-  // Mapear id_aula a nombre del aula
+  /**
+   * Devuelve el nombre del aula a partir de su id.
+   * @param idAula ID del aula.
+   * @returns Nombre del aula o el id si no se encuentra.
+   */
   const getNombreAula = (idAula: string) => {
     const aula = aulas.find(a => a.id_aula === idAula);
     return aula ? aula.nombre : idAula;

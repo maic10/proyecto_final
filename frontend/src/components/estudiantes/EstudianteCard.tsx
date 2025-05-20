@@ -1,22 +1,25 @@
-// src/components/EstudianteCard.tsx
 import noPhoto from '../../assets/no-photo.avif'; 
 
 interface Props {
   nombre: string;
   apellido: string;
-  fotoBase64?: string; // Imagen codificada en base64
-  fotoMimetype?: string; // Mimetype de la imagen (por ejemplo, "image/jpeg")
+  fotoBase64?: string; 
+  fotoMimetype?: string; 
   idEstudiante?: string;
   onClick?: (buttonRef: HTMLButtonElement) => void;
 }
 
+/**
+ * Componente visual para mostrar la información de un estudiante.
+ * Muestra la foto (o una imagen por defecto), el nombre y apellido.
+ * Si se proporciona la función onClick, muestra un botón para ver asistencias.
+ */
 function EstudianteCard({ nombre, apellido, fotoBase64, fotoMimetype, idEstudiante, onClick }: Props) {
-  // Función para obtener la URL de la imagen o la imagen por defecto
   const getImagenSrc = (): string => {
     if (fotoBase64 && fotoMimetype) {
       return `data:${fotoMimetype};base64,${fotoBase64}`;
     }
-    return noPhoto; // Usar imagen por defecto si no hay fotoBase64 o fotoMimetype
+    return noPhoto; 
   };
 
   return (

@@ -1,4 +1,3 @@
-// src/pages/admin/PaginaGestionarEstudiantes.tsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
@@ -9,6 +8,9 @@ import ListaEstudiantes from '../../components/admin/ListaEstudiantes';
 
 const ITEMS_PER_PAGE = 5; // Número de estudiantes por página
 
+/**
+ * Página para gestionar estudiantes: búsqueda, filtros, orden, paginación y visualización.
+ */
 const PaginaGestionarEstudiantes: React.FC = () => {
   const navigate = useNavigate();
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
@@ -21,18 +23,16 @@ const PaginaGestionarEstudiantes: React.FC = () => {
   const [profesoresPorAsignatura, setProfesoresPorAsignatura] = useState<{ [key: string]: Profesor[] }>({});
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busqueda, setBusqueda] = useState<string>(''); // Estado para el buscador
-  const [busquedaDebounced, setBusquedaDebounced] = useState<string>(''); // Estado para el valor debounced
-  const [ordenAscendente, setOrdenAscendente] = useState<boolean>(true); // Estado para el ordenamiento
-  const [paginaActual, setPaginaActual] = useState<number>(1); // Estado para la paginación
-  const [filtroProfesor, setFiltroProfesor] = useState<string>(''); // Filtro por profesor (ID)
-  const [filtroAsignatura, setFiltroAsignatura] = useState<string>(''); // Filtro por asignatura (ID)
-  const [usarFiltrosAvanzados, setUsarFiltrosAvanzados] = useState<boolean>(false); // Checkbox para habilitar filtros avanzados
-
-  // Mapa para rastrear solicitudes de imágenes en curso
+  const [busqueda, setBusqueda] = useState<string>(''); 
+  const [busquedaDebounced, setBusquedaDebounced] = useState<string>(''); 
+  const [ordenAscendente, setOrdenAscendente] = useState<boolean>(true); 
+  const [paginaActual, setPaginaActual] = useState<number>(1); 
+  const [filtroProfesor, setFiltroProfesor] = useState<string>(''); 
+  const [filtroAsignatura, setFiltroAsignatura] = useState<string>(''); 
+  const [usarFiltrosAvanzados, setUsarFiltrosAvanzados] = useState<boolean>(false); 
   const solicitudesImagenes = useRef<Map<string, Promise<Estudiante>>>(new Map());
 
-  // Cargar estudiantes al montar el componente (sin imágenes)
+  // Cargar estudiantes al montar el componente 
   useEffect(() => {
     const cargarEstudiantesInicial = async () => {
       setCargando(true);
@@ -64,7 +64,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     cargarEstudiantesInicial();
   }, []);
 
-  // Cargar asignaturas y profesores cuando se active el filtro avanzado
+  // Carga asignaturas y profesores cuando se activan los filtros avanzados
   useEffect(() => {
     if (!usarFiltrosAvanzados) {
       // Si los filtros avanzados no están habilitados, no cargar datos adicionales
@@ -72,7 +72,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
       setProfesores([]);
       setFiltroProfesor('');
       setFiltroAsignatura('');
-      setEstudiantesConFiltroAvanzado(estudiantes); // Restaurar la lista completa
+      setEstudiantesConFiltroAvanzado(estudiantes); 
       return;
     }
 
@@ -98,13 +98,13 @@ const PaginaGestionarEstudiantes: React.FC = () => {
         for (const profesor of profesoresData) {
           const estudiantesProfesor = await fetchEstudiantesFiltrados(profesor.id_usuario, undefined, false);
           console.log(`Estudiantes del profesor ${profesor.id_usuario}:`, estudiantesProfesor);
-          // Verificar que estudiantesProfesor sea un arreglo
+
           if (!Array.isArray(estudiantesProfesor) || estudiantesProfesor.length === 0) {
             asignaturasPorProfesorMap[profesor.id_usuario] = [];
             continue;
           }
           const clasesProfesor = estudiantesProfesor
-            .filter(est => Array.isArray(est.ids_clases)) // Filtrar estudiantes con ids_clases válido
+            .filter(est => Array.isArray(est.ids_clases)) 
             .flatMap((est: Estudiante) => est.ids_clases);
           console.log(`Clases del profesor ${profesor.id_usuario}:`, clasesProfesor);
           const clasesUnicas = [...new Set(clasesProfesor)];
@@ -128,7 +128,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
       } catch (err: any) {
         console.error('Error al cargar datos de filtros:', err);
         setError('Error al cargar asignaturas o profesores. Intenta de nuevo más tarde.');
-        setEstudiantesFiltrados([]); // Asegurar que sea un arreglo vacío en caso de error
+        setEstudiantesFiltrados([]); 
         setEstudiantesConFiltroAvanzado([]);
       } finally {
         setCargando(false);
@@ -138,7 +138,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     cargarDatosFiltros();
   }, [usarFiltrosAvanzados, filtroProfesor, filtroAsignatura, estudiantes]);
 
-  // Debounce para el filtro de búsqueda
+  // Aplica un debounce al filtro de búsqueda para evitar búsquedas excesivas
   useEffect(() => {
     const handler = setTimeout(() => {
       setBusquedaDebounced(busqueda);
@@ -149,11 +149,10 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     };
   }, [busqueda]);
 
-  // Aplicar el filtro por nombre siempre que cambie busquedaDebounced
+  // Filtra estudiantes por nombre/apellido cuando cambia el término de búsqueda
   useEffect(() => {
     let filtrados = [...estudiantesConFiltroAvanzado];
 
-    // Filtrar por búsqueda (nombre/apellido)
     if (busquedaDebounced) {
       filtrados = filtrados.filter(estudiante =>
         `${estudiante.nombre} ${estudiante.apellido}`.toLowerCase().includes(busquedaDebounced)
@@ -164,7 +163,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     setPaginaActual(1); // Resetear la página al filtrar
   }, [busquedaDebounced, estudiantesConFiltroAvanzado]);
 
-  // Manejar la búsqueda por nombre
+  // Ordena la lista de estudiantes por nombre
   const handleBusqueda = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valor = e.target.value.toLowerCase();
     setBusqueda(valor);
@@ -181,7 +180,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     setOrdenAscendente(!ordenAscendente);
   };
 
-  // Filtrar estudiantes usando la API (solo filtros avanzados)
+  // Filtra estudiantes usando la API cuando se usan filtros avanzados
   const filtrarEstudiantes = async (profesor: string, asignatura: string) => {
     let filtrados: Estudiante[] = [...estudiantes];
 
@@ -194,7 +193,7 @@ const PaginaGestionarEstudiantes: React.FC = () => {
       } catch (err: any) {
         console.error('Error al filtrar estudiantes:', err);
         setError('Error al aplicar los filtros. Intenta de nuevo más tarde.');
-        filtrados = []; // Asegurar que filtrados sea un arreglo vacío en caso de error
+        filtrados = []; 
       }
     }
 
@@ -220,13 +219,13 @@ const PaginaGestionarEstudiantes: React.FC = () => {
     paginaActual * ITEMS_PER_PAGE
   );
 
-  // Función para recargar las imágenes de los estudiantes visibles
+  // Carga las imágenes de los estudiantes visibles en la página actual
   const cargarImagenesEstudiantes = async (estudiantes: Estudiante[]) => {
     try {
       const estudiantesIds = estudiantes.map(est => est.id_estudiante);
       const estudiantesSinImagenes = estudiantesIds.filter(id => !estudiantesConImagenes[id]);
 
-      if (estudiantesSinImagenes.length === 0) return; // No hay estudiantes nuevos para cargar imágenes
+      if (estudiantesSinImagenes.length === 0) return; 
 
       const promesasImagenes: Promise<Estudiante>[] = [];
       estudiantesSinImagenes.forEach(id => {
@@ -247,13 +246,12 @@ const PaginaGestionarEstudiantes: React.FC = () => {
         const nuevosEstudiantes = { ...prev };
         estudiantesConImagenesNuevos.forEach(est => {
           nuevosEstudiantes[est.id_estudiante] = est;
-          // Eliminar la solicitud del mapa una vez que se completa
+
           solicitudesImagenes.current.delete(est.id_estudiante);
         });
         return nuevosEstudiantes;
       });
     } catch (err: any) {
-      console.error('Error al cargar imágenes de estudiantes:', err);
       setError('Error al cargar las imágenes de los estudiantes. Intenta de nuevo más tarde.');
     }
   };

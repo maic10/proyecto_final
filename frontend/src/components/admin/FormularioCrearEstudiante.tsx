@@ -32,16 +32,16 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
   setError,
 }) => {
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
-  const [todosProfesores, setTodosProfesores] = useState<Profesor[]>([]); // Lista completa de profesores
-  const [profesoresAsignatura, setProfesoresAsignatura] = useState<Profesor[]>([]); // Profesores de la asignatura seleccionada
+  const [todosProfesores, setTodosProfesores] = useState<Profesor[]>([]); 
+  const [profesoresAsignatura, setProfesoresAsignatura] = useState<Profesor[]>([]); 
   const [nuevoEstudiante, setNuevoEstudiante] = useState({ nombre: '', apellido: '' });
   const [clasesAsignadas, setClasesAsignadas] = useState<ClaseAsignada[]>([]);
   const [nuevaClaseAsignada, setNuevaClaseAsignada] = useState({ idAsignatura: '', idProfesor: '' });
   const [cargandoAsignaturas, setCargandoAsignaturas] = useState(true);
-  const [forceRender, setForceRender] = useState(0); // Forzar re-renderizado
-  const [isProfesorDisabled, setIsProfesorDisabled] = useState(false); // Controlar si el selector de profesores está deshabilitado
-  const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null); // Mensaje de confirmación
-  const [fotos, setFotos] = useState<File[]>([]); // Estado para las fotos seleccionadas
+  const [forceRender, setForceRender] = useState(0); 
+  const [isProfesorDisabled, setIsProfesorDisabled] = useState(false); 
+  const [mensajeConfirmacion, setMensajeConfirmacion] = useState<string | null>(null); 
+  const [fotos, setFotos] = useState<File[]>([]); 
 
   // Hacer que los mensajes de error y confirmación desaparezcan después de un tiempo
   useEffect(() => {
@@ -94,6 +94,8 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
 
   // Cargar profesores cuando se selecciona una asignatura
   const handleAsignaturaChange = async (idAsignatura: string) => {
+    // Cuando el usuario selecciona una asignatura, carga los profesores asociados a esa asignatura.
+    // Si solo hay un profesor, lo selecciona automáticamente.    
     try {
       const profesoresData = await obtenerProfesoresPorAsignatura(idAsignatura);
       console.log('Profesores cargados para asignatura', idAsignatura, ':', profesoresData);
@@ -118,7 +120,8 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
 
   // Añadir una asignatura y profesor al estudiante
   const handleAddClaseAsignada = () => {
-    console.log('Botón Añadir clicado'); // Depuración
+    // Añade la asignatura y el profesor seleccionados a la lista de clases asignadas al estudiante.
+    // Valida que no se repita la asignatura y que ambos campos estén seleccionados.
     if (!nuevaClaseAsignada.idAsignatura) {
       setError('Por favor, selecciona una asignatura.');
       return;
@@ -189,13 +192,13 @@ const FormularioCrearEstudiante: React.FC<FormularioCrearEstudianteProps> = ({
 
       // Enviar el estudiante y las fotos
       await onSubmit(nuevoEstudiante.nombre, nuevoEstudiante.apellido, idsClases, fotos);
-      setMensajeConfirmacion('Usuario añadido'); // Mostrar mensaje de confirmación
+      setMensajeConfirmacion('Usuario añadido'); 
       // Reiniciar el formulario
       setNuevoEstudiante({ nombre: '', apellido: '' });
       setClasesAsignadas([]);
       setNuevaClaseAsignada({ idAsignatura: '', idProfesor: '' });
       setProfesoresAsignatura([]);
-      setFotos([]); // Reiniciar las fotos
+      setFotos([]); 
       setIsProfesorDisabled(false);
     } catch (err: any) {
       console.error('Error al crear estudiante:', err);

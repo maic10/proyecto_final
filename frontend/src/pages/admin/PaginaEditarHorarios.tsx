@@ -1,14 +1,18 @@
-// src/pages/admin/PaginaEditarHorarios.tsx
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Horario, Clase, Aula, Asignatura, Profesor } from '../../types/horarios';
 import { obtenerClasePorId, actualizarHorarios, obtenerClasesPorProfesor, obtenerAulas, obtenerAsignaturas, obtenerProfesores } from '../../state/api';
 import EditarHorarios from '../../components/admin/EditarHorarios';
 
+/**
+ * Página para editar los horarios de una clase.
+ * Carga la información de la clase, aulas, asignaturas y profesores.
+ * Permite editar los horarios, validando superposiciones y mostrando mensajes de éxito o error.
+ */
 const PaginaEditarHorarios: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { idClase } = location.state || {}; // Obtener el ID desde el estado
+  const { idClase } = location.state || {}; 
 
   const [clase, setClase] = useState<Clase | null>(null);
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -76,7 +80,7 @@ const PaginaEditarHorarios: React.FC = () => {
     cargarDatos();
   }, [idClase, navigate]);
 
-  // Temporizador para limpiar mensajes de éxito y error
+  // Limpia el mensaje de éxito después de 5 segundos
   useEffect(() => {
     if (mensajeExito) {
       const timer = setTimeout(() => {
@@ -86,15 +90,20 @@ const PaginaEditarHorarios: React.FC = () => {
     }
   }, [mensajeExito]);
 
+  // Limpia el mensaje de éxito después de 3 segundos
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
         setError(null);
-      }, 5000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [error]);
 
+  /**
+   * Guarda los horarios editados de la clase.
+   * Actualiza los horarios en el backend y muestra mensaje de éxito o error.
+   */
   const handleSave = async (nuevosHorarios: Horario[]) => {
     if (!idClase) return;
 
@@ -113,11 +122,17 @@ const PaginaEditarHorarios: React.FC = () => {
     }
   };
 
+  /**
+   * Cancela la edición y vuelve a la lista de horarios.
+   */
   const handleCancel = () => {
     navigate('/admin/horarios');
   };
 
-  // Validar superposición con otros horarios del mismo profesor (en otras clases)
+  /**
+   * Valida si el nuevo horario se superpone con otros horarios del mismo profesor en otras clases.
+   * Devuelve un mensaje de error si hay superposición.
+   */
   const validarSuperposicion = async (nuevoHorario: Horario) => {
     try {
       const clasesProfesor = await obtenerClasesPorProfesor(clase!.id_usuario);
@@ -141,20 +156,15 @@ const PaginaEditarHorarios: React.FC = () => {
     }
   };
 
-  // Días válidos en español
-  // Quitar sabado y domingo en prod 
-  const diasValidos = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-
-  // Mapeo de días en español a nombres para mostrar
-  // Quitar sabado y domingo en prod 
+  // Días válidos 
+  const diasValidos = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'];
+  
   const nombresDias = {
     lunes: 'Lunes',
     martes: 'Martes',
     'miércoles': 'Miércoles',
     jueves: 'Jueves',
-    viernes: 'Viernes',
-    'sábado': 'Sábado',
-    domingo: 'Domingo',
+    viernes: 'Viernes'
   };
 
   if (cargando) {

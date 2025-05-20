@@ -1,6 +1,5 @@
-// src/components/common/RutaPrivada.tsx
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../state/useAuth'; // Actualizar importación
+import { useAuth } from '../../state/useAuth'; 
 import { cerrarSesion } from '../../state/auth';
 
 interface Props {
@@ -8,6 +7,10 @@ interface Props {
   roles: string[];
 }
 
+/**
+ * RutaPrivada: componente para proteger rutas según autenticación y rol.
+ * Si el usuario no está autenticado o no tiene el rol adecuado, redirige al inicio.
+ */
 function RutaPrivada({ children, roles }: Props) {
   const { usuario, cargando } = useAuth();
 

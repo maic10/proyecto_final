@@ -1,4 +1,3 @@
-// src/pages/PaginaTransmision.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
@@ -15,10 +14,14 @@ import { Estudiante } from '../../types/estudiantes';
 import { RegistroAsistencia } from '../../types/asistencias';
 import { API_BASE } from '../../utils/constants';
 
+/**
+ * Página de transmisión en tiempo real para el profesor.
+ * Muestra el video en vivo del aula y la asistencia de los estudiantes durante la clase.
+ */
 const PaginaTransmision: React.FC = () => {
   const [idClase, setIdClase] = useState<string | null>(null);
   const [nombreClase, setNombreClase] = useState<string>('');
-  const [nombreAula, setNombreAula] = useState<string>(''); // <-- nuevo estado para el aula
+  const [nombreAula, setNombreAula] = useState<string>(''); 
   const [clases, setClases] = useState<Clase[]>([]);
   const fechaActual = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
   const navigate = useNavigate();
@@ -29,9 +32,9 @@ const PaginaTransmision: React.FC = () => {
   const [mostrarVideo, setMostrarVideo] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [showInfo, setShowInfo] = useState<boolean>(false); // Estado para mostrar/ocultar explicación
+  const [showInfo, setShowInfo] = useState<boolean>(false); 
 
-  // Cargar clases y determinar la clase activa o más próxima
+  // Carga clases, determina la clase activa o próxima y carga estudiantes
   useEffect(() => {
     const cargarDatosIniciales = async () => {
       console.log('[Transmision] Iniciando carga de datos iniciales');
@@ -60,7 +63,7 @@ const PaginaTransmision: React.FC = () => {
         let claseActiva: Clase | null = null;
         let claseMasProxima: Clase | null = null;
         let fechaInicioMasProxima: Date | null = null;
-        let aulaSeleccionada = ''; // <-- variable temporal para el aula
+        let aulaSeleccionada = '';
 
         // Buscar clase activa hoy
         for (const clase of clasesData) {
@@ -110,7 +113,7 @@ const PaginaTransmision: React.FC = () => {
               if (!fechaInicioMasProxima || inicioFecha < fechaInicioMasProxima) {
                 fechaInicioMasProxima = inicioFecha;
                 claseMasProxima = clase;
-                aulaSeleccionada = horario.nombre_aula; // guardamos aula para próxima clase
+                aulaSeleccionada = horario.nombre_aula; // guardar aula para próxima clase
               }
             }
           }
@@ -122,7 +125,7 @@ const PaginaTransmision: React.FC = () => {
           console.log('[Transmision] Clase seleccionada final:', claseSeleccionada.nombre_asignatura);
           setIdClase(claseSeleccionada.id_clase);
           setNombreClase(claseSeleccionada.nombre_asignatura);
-          setNombreAula(aulaSeleccionada); // <-- guardamos nombre del aula
+          setNombreAula(aulaSeleccionada); //
 
           const estuds = await obtenerEstudiantes(claseSeleccionada.id_clase);
           console.log('[Transmision] Estudiantes cargados:', estuds);
@@ -141,10 +144,9 @@ const PaginaTransmision: React.FC = () => {
     cargarDatosIniciales();
   }, [navigate]);
 
-  // Cargar estado inicial de transmisión y asistencias
+  // Carga el estado de transmisión y asistencias actuales de la clase seleccionada
   const cargarDatosTransmision = async () => {
     if (!idClase) return;
-    console.log('[Transmision] cargarDatosTransmision → idClase=', idClase);
     setCargando(true);
     setError('');
     try {
@@ -173,7 +175,7 @@ const PaginaTransmision: React.FC = () => {
     if (idClase) cargarDatosTransmision();
   }, [idClase]);
 
-  // Actualizar asistencias solo cuando hay transmisión
+  // Actualiza asistencias periódicamente solo si hay transmisión activa
   useEffect(() => {
     if (idClase && hayTransmision) {
       const intervalo = setInterval(async () => {
@@ -188,7 +190,7 @@ const PaginaTransmision: React.FC = () => {
     }
   }, [idClase, hayTransmision]);
 
-  // Verificar estado de transmisión cada 5 segundos
+  // Verifica el estado de transmisión cada 5 segundos y oculta el video si termina
   useEffect(() => {
     if (!idClase) return;
     const intervalo = setInterval(async () => {
@@ -209,7 +211,7 @@ const PaginaTransmision: React.FC = () => {
     return () => clearInterval(intervalo);
   }, [idClase]);
 
-  // Cuando la transmisión termina, limpiamos inmediatamente
+ // Limpia registros y oculta video cuando termina la transmisión
   useEffect(() => {
     if (!hayTransmision) {
       setRegistros([]);
@@ -217,7 +219,7 @@ const PaginaTransmision: React.FC = () => {
     }
   }, [hayTransmision]);
 
-  // Manejar corrección manual de estado
+  // Permite corregir manualmente el estado de asistencia de un estudiante
   const handleCorregirEstado = async (idEstudiante: string, nuevoEstado: string) => {
     if (!idClase) return;
     try {

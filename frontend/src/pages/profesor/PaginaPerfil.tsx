@@ -1,4 +1,3 @@
-// src/pages/profesor/PaginaPerfil.tsx
 import React, { useState, useEffect } from 'react';
 import { obtenerUsuario } from '../../state/auth';
 import { obtenerPerfil, cambiarContrasena } from '../../state/api';
@@ -12,6 +11,11 @@ interface PerfilUsuario {
 const MIN_PASSWORD_LENGTH = 6; // Mínimo de caracteres para la contraseña
 const MESSAGE_DURATION = 2000; // Duración de los mensajes en milisegundos 
 
+/**
+ * Página de perfil del usuario.
+ * Permite ver la información del perfil y cambiar la contraseña.
+ */
+
 const PaginaPerfil: React.FC = () => {
   const usuario = obtenerUsuario();
   const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
@@ -21,7 +25,7 @@ const PaginaPerfil: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
 
-  // Obtener el perfil al cargar la página
+  // Obtiene el perfil del usuario al cargar la página
   useEffect(() => {
     const fetchPerfil = async () => {
       try {
@@ -34,12 +38,13 @@ const PaginaPerfil: React.FC = () => {
     fetchPerfil();
   }, []);
 
-  // Función para mostrar mensajes con tiempo de vida limitado
+  // Muestra mensajes de éxito o error por un tiempo limitado
   const mostrarMensaje = (setter: React.Dispatch<React.SetStateAction<string | null>>, mensaje: string) => {
     setter(mensaje);
     setTimeout(() => setter(null), MESSAGE_DURATION);
   };
 
+  // Maneja el cambio de contraseña del usuario
   const handleCambiarContrasena = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -116,7 +121,7 @@ const PaginaPerfil: React.FC = () => {
             </div>
           )}
 
-          {/* Formulario de cambio de contraseña (visible solo si se hace clic en el botón) */}
+          {/* Formulario de cambio de contraseña  */}
           {mostrarFormulario && (
             <div className="mb-4">
               <h5>Cambiar Contraseña</h5>

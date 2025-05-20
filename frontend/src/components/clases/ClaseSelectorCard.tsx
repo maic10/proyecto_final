@@ -1,4 +1,3 @@
-// src/components/ClaseSelectorCard.tsx
 import React from 'react';
 
 interface ClaseSelectorCardProps {

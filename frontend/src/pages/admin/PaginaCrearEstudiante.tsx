@@ -1,9 +1,12 @@
-// src/pages/admin/PaginaCrearEstudiante.tsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FormularioCrearEstudiante from '../../components/admin/FormularioCrearEstudiante';
 import { crearEstudiante, subirImagenEstudiante } from '../../state/api';
 
+/**
+ * Página para crear un nuevo estudiante.
+ * Gestiona el formulario, la creación del estudiante y la subida de fotos.
+ */
 const PaginaCrearEstudiante: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -12,9 +15,9 @@ const PaginaCrearEstudiante: React.FC = () => {
     try {
       // Crear el estudiante
       const response = await crearEstudiante(nombre, apellido, idsClases);
-      const idEstudiante = response.id_estudiante; // Asegúrate de que la API devuelva el ID del estudiante creado
+      const idEstudiante = response.id_estudiante; 
 
-      // Subir las fotos si hay alguna
+      // Subir las fotos si existen
       if (fotos.length > 0) {
         for (const foto of fotos) {
           await subirImagenEstudiante(idEstudiante, foto);

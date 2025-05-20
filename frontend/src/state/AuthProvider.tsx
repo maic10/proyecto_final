@@ -1,4 +1,3 @@
-// src/state/AuthProvider.tsx
 import { createContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { estaAutenticado, obtenerUsuario, cerrarSesion } from './auth';
@@ -12,12 +11,16 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Componente proveedor de autenticación
+// Componente proveedor de autenticación y contexto global
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<{ id_usuario: string; rol: string } | null>(null);
   const [cargando, setCargando] = useState(true);
   const navigate = useNavigate();
 
+  /**
+   * Verifica si el usuario está autenticado y su token es válido.
+   * Si no está autenticado, cierra la sesión y redirige al inicio.
+   */
   const verificarToken = async () => {
     setCargando(true);
     try {
@@ -37,11 +40,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCargando(false);
     }
   };
-
+  
+  // Ejecuta la verificación del token al montar el componente
   useEffect(() => {
     verificarToken();
   }, []);
 
+  /**
+   * Maneja los cambios en el almacenamiento (sessionStorage) para mantener el estado de autenticación sincronizado.
+   * Si el usuario se desloguea en otra pestaña, actualiza el estado local y redirige.
+   */
   const handleStorageChange = useCallback(() => {
     const autenticado = estaAutenticado();
     const user = obtenerUsuario();
@@ -53,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [navigate]);
 
+  // Escucha los cambios en el almacenamiento y actualiza el estado de usuario
   useEffect(() => {
     window.addEventListener('storage', handleStorageChange);
     handleStorageChange();

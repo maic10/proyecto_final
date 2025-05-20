@@ -1,10 +1,13 @@
-// src/pages/common/PaginaInicioSesion.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { guardarSesion, estaAutenticado, obtenerUsuario } from '../../state/auth';
 import { iniciarSesion } from '../../state/api';
 import { useAuth } from '../../state/useAuth';
 
+/**
+ * Página de inicio de sesión.
+ * Permite al usuario autenticarse y redirige según su rol.
+ */
 function PaginaInicioSesion() {
   const [correo, setCorreo] = useState('');
   const [contraseña, setContraseña] = useState('');
@@ -13,6 +16,7 @@ function PaginaInicioSesion() {
   const navigate = useNavigate();
   const { verificarToken } = useAuth();
 
+  // Redirige automáticamente si el usuario ya está autenticado
   useEffect(() => {
     if (estaAutenticado()) {
       const usuario = obtenerUsuario();
@@ -26,25 +30,25 @@ function PaginaInicioSesion() {
     }
   }, [navigate]);
 
+  // Maneja el envío del formulario de inicio de sesión
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setCargando(true);
 
-    if (contraseña.length < 3) {
-      setError('La contraseña debe tener al menos 3 caracteres');
+    if (contraseña.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
       setCargando(false);
       return;
     }
 
     try {
+      // Llama a la API para iniciar sesión y guarda la sesión si es correcto
       const { token, id_usuario, rol } = await iniciarSesion(correo, contraseña);
-      console.log('Datos recibidos al iniciar sesión:', { token, id_usuario, rol });
-
       guardarSesion(token, id_usuario, rol);
 
       await verificarToken();
-
+      // Redirige según el rol del usuario
       if (rol === 'admin') {
         navigate('/admin');
       } else {
@@ -73,7 +77,7 @@ function PaginaInicioSesion() {
               onChange={(e) => setCorreo(e.target.value)}
               required
               aria-describedby="correoHelp"
-              autoComplete="username" // Añadir autocomplete para el campo de correo
+              autoComplete="username" 
             />
             <div id="correoHelp" className="form-text">
               Ingresa tu correo electrónico registrado.
@@ -90,10 +94,10 @@ function PaginaInicioSesion() {
               required
               minLength={3}
               aria-describedby="contraseñaHelp"
-              autoComplete="current-password" // Añadir autocomplete para el campo de contraseña
+              autoComplete="current-password" 
             />
             <div id="contraseñaHelp" className="form-text">
-              La contraseña debe tener al menos 3 caracteres.
+              La contraseña debe tener al menos 6 caracteres.
             </div>
           </div>
           {error && (

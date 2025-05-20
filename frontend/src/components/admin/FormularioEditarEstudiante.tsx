@@ -1,4 +1,3 @@
-// src/components/admin/FormularioEditarEstudiante.tsx
 import { useState, useEffect } from 'react';
 import { Estudiante, ClaseAsignada, Imagen } from '../../types/estudiantes';
 import { obtenerAsignaturas, obtenerProfesoresPorAsignatura, subirImagenEstudiante, eliminarImagenEstudiante } from '../../state/api';
@@ -73,12 +72,12 @@ const FormularioEditarEstudiante: React.FC<FormularioEditarEstudianteProps> = ({
     }
   }, [error, setError]);
 
-  // Hacer que los mensajes de confirmación desaparezcan después de 5 segundos
+  // Hacer que los mensajes de confirmación desaparezcan después de 3 segundos
   useEffect(() => {
     if (mensajeConfirmacion) {
       const timer = setTimeout(() => {
         setMensajeConfirmacion(null);
-      }, 5000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [mensajeConfirmacion]);

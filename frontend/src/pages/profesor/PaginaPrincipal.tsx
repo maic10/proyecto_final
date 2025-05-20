@@ -1,4 +1,3 @@
-// src/pages/PaginaPrincipal.tsx
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { obtenerPerfil, obtenerClases } from '../../state/api';
@@ -6,6 +5,10 @@ import { obtenerUsuario } from '../../state/auth';
 import ClaseCard from '../../components/clases/ClaseCard';
 import { Clase, Horario } from '../../types/clases';
 
+/**
+ * Página principal del profesor.
+ * Muestra la clase activa o próxima, y la lista de clases asignadas.
+ */
 function PaginaPrincipal() {
   const [nombre, setNombre] = useState('');
   const [clases, setClases] = useState<Clase[]>([]);
@@ -14,7 +17,8 @@ function PaginaPrincipal() {
   const [cargando, setCargando] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-
+  
+  // Carga el perfil y las clases del profesor
   const cargarDatos = async () => {
     const usuario = obtenerUsuario();
     if (!usuario) {
@@ -37,12 +41,12 @@ function PaginaPrincipal() {
     }
   };
 
-  // Calcular clase activa o próxima y actualizar el temporizador
+  // Calcula y actualiza la clase activa o la próxima clase cada segundo
   useEffect(() => {
     if (clases.length > 0) {
       const calcularClaseActivaOProxima = () => {
         const ahora = new Date();
-        const diaActual = ahora.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+        const diaActual = ahora.getDay(); 
         const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
         const horaActual = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds(); // Hora actual en segundos
 
@@ -56,7 +60,7 @@ function PaginaPrincipal() {
               continue; // Saltar horarios con días inválidos
             }
             if (diaHorario !== diaActual) continue;
-
+            
             const [horaInicio, minutosInicio] = horario.hora_inicio.split(':').map(Number);
             const [horaFin, minutosFin] = horario.hora_fin.split(':').map(Number);
             const inicioSegundos = horaInicio * 3600 + minutosInicio * 60;

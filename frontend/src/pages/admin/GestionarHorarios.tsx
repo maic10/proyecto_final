@@ -1,9 +1,15 @@
-// src/pages/admin/GestionarHorarios.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clase, Profesor, Asignatura } from '../../types/horarios';
 import { obtenerProfesores, obtenerAsignaturas, obtenerClasesPorProfesor, obtenerClasesPorAsignatura } from '../../state/api';
 
+
+/**
+ * Página de gestión de horarios para el administrador.
+ * Permite filtrar clases por profesor o asignatura, ver la lista de clases resultante
+ * y seleccionar una clase para editar sus horarios.
+ * Carga los datos de profesores y asignaturas al iniciar, y muestra mensajes de carga o error según corresponda.
+ */
 const GestionarHorarios: React.FC = () => {
   const navigate = useNavigate();
   const [profesores, setProfesores] = useState<Profesor[]>([]);
@@ -44,7 +50,7 @@ const GestionarHorarios: React.FC = () => {
     };
   }, [filtroProfesor, filtroAsignatura]);
 
-  // Filtrar clases cuando cambian los filtros (con debounce)
+  // Filtrar clases cuando cambian los filtros 
   useEffect(() => {
     const cargarClases = async () => {
       setCargando(true);
@@ -70,8 +76,8 @@ const GestionarHorarios: React.FC = () => {
     }
   }, [filtroDebounced]);
 
+  // Redirige a la página de edición de horarios con el ID de la clase seleccionada
   const handleSelectClase = (clase: Clase) => {
-    // Pasar el id_clase a través del estado en lugar de la URL
     navigate('/admin/horarios/editar', { state: { idClase: clase.id_clase } });
   };
 
@@ -80,7 +86,7 @@ const GestionarHorarios: React.FC = () => {
     const profesor = profesores.find(p => p.id_usuario === idUsuario);
     return profesor ? profesor.nombre : idUsuario;
   };
-
+  
   const getNombreAsignatura = (idAsignatura: string) => {
     const asignatura = asignaturas.find(a => a.id_asignatura === idAsignatura);
     return asignatura ? asignatura.nombre : idAsignatura;

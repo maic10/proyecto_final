@@ -1,14 +1,17 @@
-// src/pages/admin/PaginaEditarEstudiante.tsx
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FormularioEditarEstudiante from '../../components/admin/FormularioEditarEstudiante';
 import { Estudiante, ClaseAsignada } from '../../types/estudiantes';
 import { obtenerEstudiantePorId, actualizarEstudiante, eliminarEstudiante, obtenerClasesAdmin } from '../../state/api';
 
+/**
+ * Página para editar un estudiante.
+ * Carga los datos del estudiante y sus clases, permite editar información, asignaturas, imágenes y eliminar el estudiante.
+ */
 const PaginaEditarEstudiante: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { idEstudiante } = location.state || {}; // Obtener el ID desde el estado
+  const { idEstudiante } = location.state || {}; 
 
   const [estudiante, setEstudiante] = useState<Estudiante | null>(null);
   const [clasesAsignadas, setClasesAsignadas] = useState<ClaseAsignada[]>([]);
@@ -29,6 +32,7 @@ const PaginaEditarEstudiante: React.FC = () => {
       }
 
       try {
+        // Obtiene los datos del estudiante y sus clases asignadas
         const estudianteData = await obtenerEstudiantePorId(idEstudiante);
         setEstudiante(estudianteData);
 
@@ -55,7 +59,7 @@ const PaginaEditarEstudiante: React.FC = () => {
     cargarEstudianteYClases();
   }, [idEstudiante, navigate]);
 
-  // Función para recargar las imágenes del estudiante
+  // Recarga las imágenes del estudiante tras una actualización
   const handleReloadImages = async () => {
     try {
       const estudianteActualizado = await obtenerEstudiantePorId(idEstudiante);
@@ -65,19 +69,20 @@ const PaginaEditarEstudiante: React.FC = () => {
       setError('Error al recargar las imágenes. Intenta de nuevo más tarde.');
     }
   };
-
+  
+  // Actualiza nombre y apellido del estudiante
   const handleSubmitInfoBasica = async (nombre: string, apellido: string) => {
     if (!estudiante) return;
 
     try {
       await actualizarEstudiante(estudiante.id_estudiante, nombre, apellido, estudiante.ids_clases);
-      // Actualizar el estado localmente sin recargar el estudiante completo
       setEstudiante(prev => prev ? { ...prev, nombre, apellido } : null);
     } catch (err: any) {
       setError(err.message || 'Error al editar el estudiante. Intenta de nuevo más tarde.');
     }
   };
 
+  // Actualiza las asignaturas y profesores asignados al estudiante
   const handleSubmitAsignaturas = async (clasesAsignadas: ClaseAsignada[]) => {
     if (!estudiante) return;
 
@@ -103,6 +108,7 @@ const PaginaEditarEstudiante: React.FC = () => {
     }
   };
 
+  // Elimina el estudiante y redirige a la lista
   const handleDelete = async (idEstudiante: string) => {
     try {
       await eliminarEstudiante(idEstudiante);

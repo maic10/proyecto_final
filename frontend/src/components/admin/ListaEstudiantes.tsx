@@ -1,4 +1,4 @@
-// src/components/admin/ListaEstudiantes.tsx
+
 import { useNavigate } from 'react-router-dom';
 import { Estudiante } from '../../types/estudiantes';
 import noPhoto from '../../assets/no-photo.avif';
@@ -10,6 +10,7 @@ interface ListaEstudiantesProps {
 const ListaEstudiantes: React.FC<ListaEstudiantesProps> = ({ estudiantes }) => {
   const navigate = useNavigate();
 
+  // Maneja la selección de un estudiante y redirige a la página de edición
   const handleSelectEstudiante = (idEstudiante: string) => {
     // Pasar el id_estudiante a través del estado en lugar de la URL
     navigate('/admin/estudiantes/editar', { state: { idEstudiante } });

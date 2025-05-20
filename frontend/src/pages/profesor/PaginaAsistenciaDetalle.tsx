@@ -1,24 +1,27 @@
-// src/pages/profesor/PaginaAsistenciaDetalle.tsx
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { obtenerUsuario } from '../../state/auth';
 import { obtenerAsistenciaDetalle } from '../../state/api';
 import { AsistenciaDetalle, Registro } from '../../types/asistencias';
 
+/**
+ * Página de detalle de asistencia para profesores.
+ * Muestra los registros de asistencia de una clase en una fecha, con filtros y resumen de estados.
+ */
+
 function PaginaAsistenciaDetalle() {
   const [detalle, setDetalle] = useState<AsistenciaDetalle | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  // filtros de UI
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todos'|'confirmado'|'tarde'|'ausente'>('todos');
 
+  // Carga el detalle de asistencia al montar el componente
   useEffect(() => { cargarDetalle(); }, []);
 
+  // Obtiene los datos de asistencia de la API y gestiona errores
   const cargarDetalle = async () => {
     setCargando(true); setError('');
     const usuario = obtenerUsuario();
@@ -54,7 +57,7 @@ function PaginaAsistenciaDetalle() {
     }
   };
 
-  // Estadísticas y filtrado memoriza­dos
+  // Calcula estadísticas y filtra registros según búsqueda y estado
   const { confirmados, tardes, ausentes, filtrados } = useMemo(() => {
     const regs = detalle?.registros || [];
     let c=0, t=0, a=0;
